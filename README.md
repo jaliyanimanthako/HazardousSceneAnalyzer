@@ -40,7 +40,7 @@ Each image produces:
 
 | Field | Description |
 |---|---|
-| `objects_detected` | All objects identified by OWLv2 and Florence |
+| `objects_detected` | All objects identified by OWLv2 and Florence (offline) or Qwen2.5-VL (online) |
 | `possible_hazards` | Canonical hazard types: fire, smoke, chemical, spill, structural, electrical, biological |
 | `severity` | Overall severity: low / medium / high / critical |
 | `explanation` | Risk-focused narrative for the operator — why the hazards are dangerous and what action is needed |
@@ -124,10 +124,10 @@ cp .env.sample .env
 | Key | Required for | Where to get it |
 |---|---|---|
 | `HF_TOKEN` | Offline mode (Llama download) | [huggingface.co/settings/tokens](https://huggingface.co/settings/tokens) |
-| `OPENROUTER_API_KEY` | Online mode (default — free) | [openrouter.ai/keys](https://openrouter.ai/keys) |
+| `OPENROUTER_API_KEY` | Online mode (default) | [openrouter.ai/keys](https://openrouter.ai/keys) |
 | `OPENAI_API_KEY` | Online mode (`--provider openai`) | [platform.openai.com/api-keys](https://platform.openai.com/api-keys) |
 
-> **API cost:** OpenRouter is the default provider and offers a free tier — `python online.py` works out of the box with just an OpenRouter key. OpenAI (`--provider openai`) requires a paid API account.
+> **API cost:** Qwen2.5-VL-72B via OpenRouter (default) is free. OpenAI (`--provider openai`) requires a paid API account.
 
 > **Llama access:** Before running offline mode, you must accept the Llama-3.2 licence at [huggingface.co/meta-llama/Llama-3.2-3B-Instruct](https://huggingface.co/meta-llama/Llama-3.2-3B-Instruct) using the same HuggingFace account as your token. Access is granted by Meta — first-time requests typically take **10–15 minutes** to be approved. You will receive an email confirmation once access is granted.
 
