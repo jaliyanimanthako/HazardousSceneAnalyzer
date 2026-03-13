@@ -77,6 +77,8 @@ Each image produces:
 
 Uses three local models (OWLv2 + Florence-2 + Llama) running entirely on the device. No internet connection required after the initial model download. Produces colour-coded annotated images with bounding boxes.
 
+> **Hardware:** The pipeline is designed for edge deployment on NVIDIA Jetson (AGX Orin or similar). For local testing and development, a desktop NVIDIA GPU with CUDA support is required (RTX 3080 / RTX 4070 or better recommended). The full pipeline loads ~10–12 GB of VRAM.
+
 ```bash
 # Single image
 python offline.py /path/to/image.jpg
