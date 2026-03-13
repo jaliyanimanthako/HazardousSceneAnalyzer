@@ -1,0 +1,122 @@
+# ──────────────────────────────────────────────────────────────────────────────
+# Hazard Analyzer Configuration
+# All labels, keywords, colours, and thresholds used by hd.py.
+# Edit this file to tune detection behaviour without touching Python code.
+# ──────────────────────────────────────────────────────────────────────────────
+
+# Phrases always grounded regardless of caption content (high-priority recalls)
+always_check:
+  - fire
+  - person
+  - barrel
+  - liquid spill
+  - exposed wire
+  - smoke
+  - collapsed structure
+
+# Florence phrase → warning label shown on the annotated image
+display_labels:
+  fire:                "⚠ fire"
+  smoke:               "⚠ smoke"
+  explosion:           "⚠ explosion"
+  sparks:              "⚠ sparks/arc"
+  gas cloud:           "⚠ gas cloud"
+  barrel:              "⚠ barrel/drum"
+  tank:                "⚠ tank/vessel"
+  pipe:                "⚠ pipe/valve"
+  cylinder:            "⚠ pressure cylinder"
+  liquid spill:        "⚠ unidentified liquid spill"
+  liquid on floor:     "⚠ wet floor/spill"
+  dripping pipe:       "⚠ leaking pipe"
+  collapsed structure: "⚠ structural collapse"
+  debris:              "⚠ debris"
+  crack:               "⚠ structural crack"
+  damaged equipment:   "⚠ damaged equipment"
+  exposed wire:        "⚠ exposed wire"
+  electrical panel:    "⚠ electrical panel"
+  sparking equipment:  "⚠ sparking equipment"
+  person:              "⚠ person/worker"
+  injured person:      "⚠ person/casualty"
+  hazmat sign:         "⚠ hazmat placard"
+  warning cone:        "⚠ warning barrier"
+  safety sign:         "⚠ safety sign"
+  vehicle:             "⚠ vehicle/machinery"
+  equipment:           "⚠ heavy equipment"
+
+# Substance hedging rules: [regex_pattern, replacement]
+# Replaces overconfident substance names produced by Florence with hedged language.
+# Patterns use Python re.sub syntax.
+substance_hedges:
+  - ['\boil\b',                            'an unidentified liquid']
+  - ['\bfuel\b',                           'an unidentified liquid']
+  - ['\bacid\b',                           'an unidentified chemical']
+  - ['\bsolvent\b',                        'an unidentified chemical']
+  - ['\bwater\b',                          'a liquid']
+  - ['covered in (a thick layer of )?oil', 'covered in an unidentified substance']
+  - ['layer of oil',                       'layer of unidentified liquid']
+  - ['amount of oil',                      'amount of unidentified liquid']
+  - ['oil spill(ing)?',                    'unidentified liquid spill']
+  - ['spilling oil',                       'spilling an unidentified liquid']
+
+# Canonical hazard type names accepted by the LLM prompt and output schema
+valid_hazard_types:
+  - fire
+  - smoke
+  - chemical
+  - structural
+  - electrical
+  - biological
+  - spill
+
+# Keyword fallback: used when LLM is disabled or fails
+hazard_keywords:
+  chemical:         [chemical, drum, barrel, container, tank, canister, toxic, hazmat]
+  fire:             [fire, flame, burning, explosion, heat, blaze]
+  smoke:            [smoke, steam, fume, haze]
+  spill:            [spill, leak, liquid, puddle, fluid, oil, water, pool]
+  structural:       [debris, rubble, collapse, broken, damaged, fallen, crack]
+  electrical:       [wire, electrical, cable, power, exposed, spark]
+  biological:       [body, person, injured, victim, casualty, human]
+  safety_equipment: [cone, sign, barrier, tape, warning, caution, helmet]
+
+# OD label keyword → hazard display label
+# Used to promote object-detection results into the hazard list (no extra calls)
+od_hazard_map:
+  person:   "⚠ person/worker"
+  people:   "⚠ person/worker"
+  barrel:   "⚠ barrel/drum"
+  drum:     "⚠ barrel/drum"
+  tank:     "⚠ tank/vessel"
+  truck:    "⚠ vehicle"
+  forklift: "⚠ vehicle/machinery"
+  crane:    "⚠ vehicle/machinery"
+  bottle:   "⚠ container"
+  fire:     "⚠ fire"
+  smoke:    "⚠ smoke"
+  wire:     "⚠ exposed wire"
+  cable:    "⚠ exposed wire"
+
+# Bounding box colours for annotated images (keyword in label → CSS hex colour)
+hazard_colors:
+  fire:      "#FF3300"
+  flame:     "#FF6600"
+  smoke:     "#9933FF"
+  explosion: "#FF0000"
+  chemical:  "#00FF00"
+  debris:    "#FF9900"
+  injured:   "#FF00FF"
+  damage:    "#0099FF"
+  spill:     "#00FFFF"
+  wire:      "#FFFF00"
+  person:    "#FF66FF"
+  barrel:    "#FF8800"
+  tank:      "#FF8800"
+  pipe:      "#AAAAAA"
+  vehicle:   "#88AAFF"
+
+# Rule-based severity messages shown in fallback explanations
+severity_messages:
+  critical: "CRITICAL - Immediate evacuation required."
+  high:     "HIGH RISK - Exercise extreme caution."
+  medium:   "MODERATE RISK - Proceed with safety measures."
+  low:      "LOW RISK - Continue assessment."

@@ -1,0 +1,81 @@
+owl_hazard_queries:
+  - fire burning
+  - large flames
+  - orange and yellow flames
+  - smoke rising
+  - thick black smoke
+  - explosion fireball
+  - sparks and electrical arc
+  - gas cloud vapor
+  - industrial barrel or drum
+  - chemical drum
+  - storage tank or vessel
+  - pressurized cylinder
+  - pipe or valve
+  - liquid spill on floor
+  - collapsed structure or debris
+  - structural crack or damage
+  - exposed electrical wire
+  - damaged electrical panel
+  - person or worker
+  - injured person on ground
+  - hazmat warning sign
+  - safety warning cone or barrier
+  - forklift or crane
+  - heavy machinery
+
+query_to_display:
+  fire burning: "⚠ fire"
+  large flames: "⚠ fire"
+  orange and yellow flames: "⚠ fire"
+  smoke rising: "⚠ smoke"
+  thick black smoke: "⚠ smoke"
+  explosion fireball: "⚠ explosion"
+  sparks and electrical arc: "⚠ sparks/arc"
+  gas cloud vapor: "⚠ gas cloud"
+  industrial barrel or drum: "⚠ barrel/drum"
+  chemical drum: "⚠ barrel/drum"
+  storage tank or vessel: "⚠ tank/vessel"
+  pressurized cylinder: "⚠ pressure cylinder"
+  pipe or valve: "⚠ pipe/valve"
+  liquid spill on floor: "⚠ unidentified liquid spill"
+  collapsed structure or debris: "⚠ structural collapse"
+  structural crack or damage: "⚠ structural crack"
+  exposed electrical wire: "⚠ exposed wire"
+  damaged electrical panel: "⚠ electrical panel"
+  person or worker: "⚠ person/worker"
+  injured person on ground: "⚠ person/casualty"
+  hazmat warning sign: "⚠ hazmat placard"
+  safety warning cone or barrier: "⚠ warning barrier"
+  forklift or crane: "⚠ vehicle/machinery"
+  heavy machinery: "⚠ heavy equipment"
+
+type_max_instances:
+  unidentified: 2
+  barrel: 4
+  tank: 3
+  fire: 2
+  smoke: 2
+  person: 4
+  pipe: 2
+  structural: 2
+  exposed: 2
+  electrical: 2
+  hazmat: 3
+  pressure: 2
+  vehicle: 2
+  warning: 2
+  gas: 1
+  explosion: 1
+  sparks: 1
+  _default: 3
+
+category_conf:
+  unidentified: 0.22
+  fire: 0.08
+  smoke: 0.08
+  explosion: 0.08
+  person: 0.12
+  barrel: 0.12
+  tank: 0.12
+  _default: 0.14
