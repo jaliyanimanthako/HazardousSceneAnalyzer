@@ -64,7 +64,7 @@ Each image produces:
 
 | Original image | Offline mode — OWLv2 bounding boxes | Online mode — no bounding boxes |
 |---|---|---|
-| ![Original image](Images/1.png) | ![Offline annotated result](annotated_1_local.png) | ![Online annotated result](annotated_1_onlinepng.png) |
+| ![Original image](Images/1.png) | ![Offline annotated result](Images/annotated_1_local.png) | ![Online annotated result](Images/annotated_1_onlinepng.png) |
 
 ---
 
