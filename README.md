@@ -45,28 +45,29 @@ Each image produces:
 
 ```
 .
-├── hd.py                        # Pipeline orchestrator (thin — delegates to modules)
-├── offline.py                     # CLI entry point (single image or folder)
+├── hd.py                          # Pipeline orchestrator (thin — delegates to modules)
+├── offline.py                     # Offline runner CLI (OWLv2 + Florence-2 + Llama)
+├── online.py                      # Online runner CLI (single VLM API call)
+├── .env.sample                    # API key template — copy to .env and fill in keys
 │
 ├── engines/
-│   ├── florence_engine.py       # Florence-2 wrapper: loading, preprocessing, all tasks
-│   └── llm_engine.py            # LLM wrapper: 4-bit loading, streaming, JSON parsing
+│   ├── florence_engine.py         # Florence-2 wrapper: loading, preprocessing, all tasks
+│   ├── llm_engine.py              # LLM wrapper: 4-bit loading, streaming, JSON parsing
+│   └── qwen_engine.py             # VLM API wrapper (OpenAI-compatible: OpenRouter, OpenAI, Qwen)
 │
 ├── utils/
-│   ├── assessment.py            # Hazard assessment logic (LLM + keyword fallback)
-│   ├── grounding.py             # Phrase grounding, IoU dedup, placard OCR
-│   ├── reporting.py             # Terminal report and annotated image output
-│   └── prompts.py               # LLM system prompt and HAZMAT vocabulary
+│   ├── assessment.py              # Hazard assessment logic (LLM + keyword fallback)
+│   ├── grounding.py               # Phrase grounding, IoU dedup, placard OCR
+│   ├── online_processing.py       # Online pipeline: bbox conversion, postprocess, constants
+│   ├── reporting.py               # Terminal report and annotated image output
+│   └── prompts.py                 # LLM system prompts and HAZMAT vocabulary
 │
 ├── object_Dectetion/
-│   └── owl.py                   # OWLv2 detector — drop-in for Florence detection
+│   └── owl.py                     # OWLv2 detector — drop-in for Florence detection
 │
-├── configs/
-│   ├── hazard_config.yaml        # Labels, keywords, colours, severity messages, UN hazmat classes
-│   └── config.yaml               # OWLv2 queries, confidence thresholds, instance caps
-│
-├── offline.py                     # Offline runner (OWLv2 + Florence-2 + Llama)
-└── online.py                    # Online runner (single VLM API call)
+└── configs/
+    ├── hazard_config.yaml          # Labels, keywords, colours, severity messages, UN hazmat classes
+    └── config.yaml                 # OWLv2 queries, confidence thresholds, instance caps
 ```
 
 ---
@@ -210,11 +211,27 @@ All detection behaviour is controlled through YAML — no Python changes needed 
 
 ## Installation
 
+**1. Create a conda environment with Python 3.10**
+
+```bash
+conda create -n hazard-analyzer python=3.10 -y
+conda activate hazard-analyzer
+```
+
+**2. Install dependencies**
+
 ```bash
 pip install -r requirements.txt
 ```
 
-A CUDA-capable GPU is strongly recommended. The full pipeline (OWLv2-large + Florence-2-base + Llama-3.2-3B) requires approximately 10–12 GB VRAM.
+**3. Set up API keys (online mode only)**
+
+```bash
+cp .env.sample .env
+# Edit .env and add your OPENROUTER_API_KEY (or OPENAI_API_KEY)
+```
+
+A CUDA-capable GPU is required for offline mode. The full pipeline (OWLv2-large + Florence-2-base + Llama-3.2-3B) requires approximately 10–12 GB VRAM.
 
 ---
 
