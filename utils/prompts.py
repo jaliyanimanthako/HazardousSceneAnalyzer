@@ -77,14 +77,24 @@ RULES:
 11. SEVERITY CONSISTENCY RULE: overall_severity must equal the HIGHEST severity among all individual hazards.
     - If any hazard is HIGH, overall_severity cannot be LOW or MEDIUM.
     - If any hazard is CRITICAL, overall_severity must be CRITICAL.
-12. For clarifying_question: ONLY ask a question if the answer would change the response protocol.
-    Return null if scene evidence is sufficient to act.
+12. For clarifying_question: Ask a question whenever the answer would meaningfully change
+    the response protocol, the PPE required, or the evacuation decision.
+    You should almost ALWAYS have a clarifying question unless the scene is completely unambiguous
+    (e.g. an empty room with no hazards). When hazards ARE present, there is nearly always
+    something worth confirming with the operator.
+    Return null ONLY when you have already identified all hazards conclusively AND no personnel
+    decisions remain open.
     BAD: "What is the exact temperature of the flames?" (does not change protocol)
-    GOOD: "What substance does the barrel label identify?" (changes PPE and containment approach)
-    GOOD: "Are personnel still inside the building?" (changes evacuation priority)
+    BAD: "How long has the fire been burning?" (does not change immediate response)
+    GOOD: "What substance does the barrel/container label identify?" (changes PPE and containment approach)
+    GOOD: "Are personnel still inside the affected area?" (changes evacuation priority)
+    GOOD: "Has the power supply to this zone been isolated?" (changes electrical hazard response)
+    GOOD: "Is the source of the smoke known — fire or chemical release?" (changes response team type)
+    GOOD: "Is the structure currently occupied?" (changes urgency of evacuation order)
 
 After generating the JSON, silently review it once:
-- Does the clarifying_question change what responders would DO? If not, set to null.
+- Is clarifying_question null even though hazards are present? If so, write one — there is almost always something the operator can confirm that would change the response.
+- Does the clarifying_question change what responders would DO? If not, replace it with a better one.
 - Are recommendations specific (mention PPE, equipment, protocols by name)?
 - Is overall_severity equal to the highest individual hazard severity? Fix if not.
 - Does any description claim to identify a substance that cannot be visually confirmed? Replace with hedged language.
@@ -96,6 +106,7 @@ Start your response with '{' and end with '}'.
 
 Respond in valid JSON:
 {
+  "scene_description": "2-4 sentence factual synthesis of what is visible in the scene, integrating the detected objects and visual description. State what objects are present, their approximate positions, and any notable conditions. Do NOT include hazard assessments here — only describe what is seen.",
   "hazards": [
     {
       "type": "EXACTLY one of: fire, smoke, chemical, structural, electrical, biological, spill",
@@ -106,7 +117,7 @@ Respond in valid JSON:
   ],
   "overall_severity": "EXACTLY one of: low, medium, high, critical",
   "confidence": 0.75,
-  "summary": "4-8 sentence briefing for team leader",
+  "summary": "4-8 sentence briefing for team leader combining scene description and hazard assessment",
   "decision_support": "1-3 sentence plain-language explanation of the robot's reasoning for the human operator — what was seen, what risk it implies, and what the operator should consider doing. No jargon.",
   "recommendations": ["specific actionable recommendation with equipment/protocol", "recommendation 2"],
   "clarifying_question": "question that changes response protocol, or null"

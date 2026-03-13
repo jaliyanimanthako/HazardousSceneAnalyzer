@@ -51,7 +51,7 @@ def visualize(
         font = ImageFont.load_default()
 
     # ── Objects — yellow ──────────────────────────────────────────────────────
-    for obj in output.get("objects_detected_detail", []):
+    for obj in output.get("_objects_detected_detail", []):
         bb = obj["bounding_box"]
         draw.rectangle(
             [bb["x1"], bb["y1"], bb["x2"], bb["y2"]], outline="yellow", width=2
@@ -59,7 +59,7 @@ def visualize(
         draw.text((bb["x1"], bb["y1"] - 15), obj["label"], fill="yellow", font=font)
 
     # ── Hazards — colour-coded ────────────────────────────────────────────────
-    for hazard in output.get("hazards_detected_detail", []):
+    for hazard in output.get("_hazards_detected_detail", []):
         bb    = hazard["bounding_box"]
         label = hazard["label"]
         color = next(
@@ -84,73 +84,32 @@ def visualize(
 
 def print_report(output: dict) -> None:
     """
-    Print a human-readable operator report to stdout.
+    Print a concise operator report to stdout.
 
     Args:
         output: Result dict from HazardousSceneAnalyzer.analyze().
     """
-    ss  = output.get("scene_summary", {})
     sep = "=" * 65
 
     print(f"\n{sep}")
-    print("🤖 MOBILE ROBOT HAZARD ANALYSIS — OPERATOR REPORT")
+    print("🤖 HAZARD ANALYSIS REPORT")
     print(sep)
-    print(f"\n📁 Image         : {output['image_path']}")
-    print(f"⚙️  Reasoning      : {output.get('reasoning_source', 'unknown').upper()}")
 
-    # Objects
-    print(f"\n{'─'*65}")
-    print("📦 OBJECTS DETECTED")
-    print(f"{'─'*65}")
-    for label in output.get("objects_detected", []):
-        print(f"   • {label}")
+    print(f"\n📦 Objects Detected : {', '.join(output.get('objects_detected', [])) or 'None'}")
 
-    # Hazard bboxes
-    print(f"\n🎯 HAZARD REGIONS (with bounding boxes)")
-    for h in output.get("hazards_detected_detail", []):
-        bb = h["bounding_box"]
-        print(f"   • {h['label']}  [{bb['x1']},{bb['y1']} → {bb['x2']},{bb['y2']}]")
+    hazards = output.get("possible_hazards", [])
+    severity = output.get("severity", "unknown").upper()
+    print(f"⚠️  Possible Hazards : {', '.join(hazards) or 'None detected'}  [{severity}]")
 
-    # Scene summary
-    print(f"\n{'─'*65}")
-    print("📝 SCENE SUMMARY")
-    print(f"{'─'*65}")
-    print(f"   {ss.get('description', '')}")
-    print(f"\n⚠️  Possible Hazards : {', '.join(ss.get('possible_hazards', [])) or 'None detected'}")
-    print(f"   Severity         : {ss.get('severity', '?').upper()}")
-
-    if ss.get("hazard_details"):
-        print(f"\n   Hazard Details:")
-        for h in ss["hazard_details"]:
-            print(f"   • [{h.get('severity','?').upper()}] {h.get('type','?').upper()}")
-            print(f"     Location : {h.get('location', 'unknown')}")
-            print(f"     Detail   : {h.get('description', '')}")
-
-    # Explanation
-    print(f"\n{'─'*65}")
-    print("💡 DECISION-SUPPORT EXPLANATION  (for operator)")
-    print(f"{'─'*65}")
+    print(f"\n💡 Explanation :")
     print(f"   {output.get('explanation', '')}")
 
-    if output.get("full_briefing") and output["full_briefing"] != output.get("explanation"):
-        print(f"\n📋 Full Team Briefing:")
-        print(f"   {output['full_briefing']}")
-
-    if output.get("recommendations"):
-        print(f"\n🚨 Recommendations:")
-        for i, rec in enumerate(output["recommendations"], 1):
-            print(f"   {i}. {rec}")
-
-    # Confidence bar
-    print(f"\n{'─'*65}")
     conf = output.get("confidence", 0.5)
     bar  = "█" * int(conf * 20) + "░" * (20 - int(conf * 20))
-    print(f"📊 CONFIDENCE : {conf:.2f}  [{bar}]")
+    print(f"\n📊 Confidence : {conf:.2f}  [{bar}]")
 
     if output.get("clarifying_question"):
-        print(f"\n❓ CLARIFYING QUESTION (ask operator):")
+        print(f"\n❓ Clarifying Question :")
         print(f"   {output['clarifying_question']}")
-    else:
-        print(f"\n   (No clarifying question — sufficient evidence to act)")
 
     print(f"\n{sep}\n")

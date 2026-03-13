@@ -5,12 +5,12 @@ Standalone functions: pass engines and config dicts as arguments.
 
 Debug tips:
     # Test JSON parsing without running the full LLM
-    from assessment import normalize_hazard_type, hedge_caption
+    from utils.assessment import normalize_hazard_type, hedge_caption
     print(normalize_hazard_type("fire|smoke", valid_types))
     print(hedge_caption("oil spill near the tank", substance_hedges))
 
     # Test keyword fallback without any model
-    from assessment import assess_hazards_keywords
+    from utils.assessment import assess_hazards_keywords
     result = assess_hazards_keywords(["barrel", "fire"], "smoke rising", hazard_keywords)
 """
 
@@ -19,7 +19,7 @@ import re
 from typing import TYPE_CHECKING
 
 if TYPE_CHECKING:
-    from llm_engine import LLMEngine
+    from engines.llm_engine import LLMEngine
 
 
 # ── Caption hedging ───────────────────────────────────────────────────────────
@@ -105,7 +105,7 @@ def assess_hazards_with_llm(
         substance_hedges:   (pattern, replacement) pairs from hazard_config.yaml.
         valid_hazard_types: Set of canonical hazard type names.
     """
-    from llm_engine import LLMEngine  # local import to avoid circular dependency
+    from engines.llm_engine import LLMEngine  # local import to avoid circular dependency
 
     hedged_caption  = hedge_caption(caption, substance_hedges)
     hedged_regions  = [
@@ -158,20 +158,57 @@ Provide your JSON hazard assessment based ONLY on this evidence."""
     if enforced_severity != declared_overall:
         print(f"  ⚠ Severity corrected: '{declared_overall}' → '{enforced_severity}'")
 
+    # If the LLM returned null but hazards are present, generate a rule-based question.
+    # Small models frequently ignore the clarifying_question instruction.
+    clarifying = llm_result.get("clarifying_question")
+    if not clarifying and seen_types:
+        clarifying = _clarifying_question_for(list(seen_types))
+        print(f"  ℹ Clarifying question auto-generated (LLM returned null)")
+
     return {
         "detected_hazard_types": list(seen_types),
         "hazards_detail":        deduped_details,
         "severity":              enforced_severity,
         "confidence":            llm_result.get("confidence", 0.7),
+        "scene_description":     llm_result.get("scene_description", ""),
         "summary":               llm_result.get("summary", ""),
         "decision_support":      llm_result.get("decision_support", ""),
         "recommendations":       llm_result.get("recommendations", []),
-        "clarifying_question":   llm_result.get("clarifying_question"),
+        "clarifying_question":   clarifying,
         "source":                "llm",
     }
 
 
 # ── Keyword fallback ──────────────────────────────────────────────────────────
+
+def _clarifying_question_for(detected_hazards: list) -> "str | None":
+    """
+    Return the single most operationally useful clarifying question for the
+    detected hazard set. Priority order mirrors response urgency.
+    Returns None only when no hazards were detected.
+    """
+    if not detected_hazards:
+        return None
+
+    hazard_set = set(detected_hazards)
+
+    if "biological" in hazard_set:
+        return "Are personnel still inside the affected area, and have they been accounted for?"
+    if "fire" in hazard_set:
+        return "Is the fire contained to one area, or is it spreading — and has the building been evacuated?"
+    if "chemical" in hazard_set or "spill" in hazard_set:
+        return "What substance does the container or barrel label identify? This determines the required PPE and containment protocol."
+    if "structural" in hazard_set:
+        return "Is the structure currently occupied, and are there signs of progressive collapse?"
+    if "electrical" in hazard_set:
+        return "Has the power supply to this zone been isolated at the breaker?"
+    if "smoke" in hazard_set:
+        return "Is the source of the smoke a fire or a chemical release? This determines whether fire crews or HAZMAT teams respond first."
+
+    # Generic fallback for any other detected hazard type
+    primary = detected_hazards[0]
+    return f"Can the operator confirm whether the {primary} hazard is active or contained?"
+
 
 def assess_hazards_keywords(
     objects: list,
@@ -212,7 +249,7 @@ def assess_hazards_keywords(
         "confidence":            0.5,
         "summary":               "",
         "recommendations":       [],
-        "clarifying_question":   None,
+        "clarifying_question":   _clarifying_question_for(detected_hazards),
         "source":                "keyword_fallback",
     }
 
@@ -225,23 +262,81 @@ def generate_explanation(
     severity_messages: dict,
 ) -> str:
     """
-    Build a plain-language explanation without the LLM.
-    Used when LLM is disabled or decision_support is missing from the LLM output.
+    Build an operator-facing RISK ASSESSMENT — not a scene description.
+
+    Focuses on WHY detected hazards are dangerous and what to do, NOT on
+    re-describing what was seen. The LLM's hazard descriptions (hdesc) are
+    intentionally NOT echoed — they describe appearance; this function
+    reasons about consequence and required action.
 
     Args:
         objects:           Detected object labels.
         hazard_assessment: Output dict from assess_hazards_* functions.
         severity_messages: {severity: message} from hazard_config.yaml.
     """
-    parts = []
-    if objects:
-        parts.append(f"Detected {len(objects)} object(s).")
-    hazards = hazard_assessment["detected_hazard_types"]
-    parts.append(
-        f"Potential hazards: {', '.join(hazards)}." if hazards
-        else "No obvious hazards detected."
+    severity = hazard_assessment.get("severity", "low")
+    details  = hazard_assessment.get("hazards_detail", [])
+    hazards  = hazard_assessment.get("detected_hazard_types", [])
+    parts    = []
+
+    if not hazards:
+        parts.append("No active hazards were identified in this scene.")
+        parts.append(severity_messages.get(severity, "Continue monitoring."))
+        return " ".join(parts)
+
+    # ── Risk consequence per hazard type ──────────────────────────────────────
+    # Each entry explains WHY the hazard is dangerous, not what it looks like.
+    _risk_reason = {
+        "fire":       "poses an immediate life-safety threat — ignition of surrounding materials, burns, and smoke inhalation are primary concerns.",
+        "smoke":      "indicates an active fire or chemical release — the source must be confirmed before personnel approach.",
+        "chemical":   "means appropriate PPE cannot be selected until the substance is identified — treat as hazardous until confirmed otherwise.",
+        "spill":      "creates slip, contamination, and potential ignition risk — the substance must be identified before containment can begin.",
+        "electrical": "poses electrocution risk — the power supply to this zone must be isolated at the breaker before any approach.",
+        "structural": "presents collapse risk to anyone in or near the area — load-bearing elements must be assessed before re-entry.",
+        "biological": "personnel are inside the hazard zone — their condition and evacuation status must be confirmed immediately.",
+    }
+
+    # Sort most-severe first so the lead sentence addresses the highest risk
+    _sev_rank    = {"critical": 0, "high": 1, "medium": 2, "low": 3}
+    sorted_details = sorted(
+        details, key=lambda h: _sev_rank.get(h.get("severity", "low"), 3)
     )
-    parts.append(
-        f"RECOMMENDATION: {severity_messages.get(hazard_assessment['severity'], 'Unknown')}"
-    )
+
+    for h in sorted_details:
+        htype   = h.get("type", "unknown")
+        hsev    = h.get("severity", "unknown").upper()
+        hloc    = h.get("location", "")
+        reason  = _risk_reason.get(htype, f"a {htype} hazard has been detected and requires assessment.")
+        loc_str = f" at {hloc}" if hloc else ""
+        parts.append(f"{hsev} {htype.upper()} hazard{loc_str}: {reason}".capitalize())
+
+    # If only keyword fallback ran (no detail records), use hazard type names
+    if not sorted_details and hazards:
+        hazard_list = " and ".join(hazards) if len(hazards) <= 3 else ", ".join(hazards)
+        parts.append(f"Potential {hazard_list} hazard(s) detected — scene requires immediate assessment.")
+
+    # ── How specific detected objects compound the risk ───────────────────────
+    _compounding = {
+        "barrel": "storage barrels near the hazard zone raise contamination risk if contents are unknown or containers are damaged",
+        "drum":   "drums in proximity to the hazard raise contamination concern if unsealed",
+        "tank":   "pressurised tanks near an active hazard create explosion or uncontrolled release risk",
+        "person": "workers detected inside the hazard perimeter — evacuation status must be confirmed",
+        "worker": "workers detected inside the hazard perimeter — evacuation status must be confirmed",
+        "wire":   "exposed wiring adjacent to a spill or fire significantly elevates electrical risk",
+    }
+
+    compound_notes = []
+    seen_notes     = set()
+    for obj in objects:
+        for kw, note in _compounding.items():
+            if kw in obj.lower() and note not in seen_notes:
+                compound_notes.append(note)
+                seen_notes.add(note)
+
+    if compound_notes:
+        parts.append("Compounding factors: " + "; ".join(compound_notes) + ".")
+
+    # ── Required action ───────────────────────────────────────────────────────
+    parts.append(severity_messages.get(severity, "Proceed with caution."))
+
     return " ".join(parts)

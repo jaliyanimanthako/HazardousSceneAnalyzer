@@ -4,16 +4,18 @@ Hazard Grounding — phrase-based detection helpers
 Standalone functions: no class state, easy to unit-test in isolation.
 
 Debug tips:
-    from grounding import build_scene_phrases, calculate_iou
+    from utils.grounding import build_scene_phrases, calculate_iou
     phrases = build_scene_phrases("smoke rising from a barrel", vocab, always_check)
     print(phrases)
 """
 
+import re
+
 from PIL import Image
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, Optional
 
 if TYPE_CHECKING:
-    from florence_engine import FlorenceEngine
+    from engines.florence_engine import FlorenceEngine
 
 
 # ── Geometry ──────────────────────────────────────────────────────────────────
@@ -64,6 +66,9 @@ def build_scene_phrases(caption: str, hazmat_vocab: dict, always_check: list) ->
 
 # ── Grounding ─────────────────────────────────────────────────────────────────
 
+_PLACARD_PHRASES = {"hazmat sign", "hazmat placard", "warning sign", "safety sign"}
+
+
 def detect_hazards_by_grounding(
     florence_engine: "FlorenceEngine",
     image: Image.Image,
@@ -74,6 +79,8 @@ def detect_hazards_by_grounding(
     min_area_fraction: float = 0.005,
     max_per_phrase: int = 3,
     iou_threshold: float = 0.75,
+    hazmat_classes: Optional[dict] = None,
+    hazmat_placard_keywords: Optional[dict] = None,
 ) -> dict:
     """
     Dense multi-instance hazard grounding using Florence phrase grounding.
@@ -121,7 +128,7 @@ def detect_hazards_by_grounding(
             bboxes.sort(key=lambda b: (b[2] - b[0]) * (b[3] - b[1]), reverse=True)
             bboxes = bboxes[:max_per_phrase]
 
-            display_label = display_labels.get(phrase, f"⚠ {phrase}")
+            is_placard = phrase in _PLACARD_PHRASES
 
             for bbox in bboxes:
                 # Only suppress if SAME phrase type overlaps heavily (type-aware dedup)
@@ -130,10 +137,25 @@ def detect_hazards_by_grounding(
                     and r["phrase_type"] == phrase
                     for r in claimed_regions
                 )
-                if not already_claimed:
-                    all_bboxes.append(bbox)
-                    all_labels.append(display_label)
-                    claimed_regions.append({"bbox": bbox, "phrase_type": phrase})
+                if already_claimed:
+                    continue
+
+                # Try OCR-based placard identification
+                if is_placard and hazmat_classes and hazmat_placard_keywords:
+                    placard_id = identify_hazmat_placard(
+                        florence_engine, image, bbox,
+                        hazmat_classes, hazmat_placard_keywords,
+                    )
+                    if placard_id:
+                        display_label = f"⚠ hazmat: {placard_id}"
+                    else:
+                        display_label = display_labels.get(phrase, f"⚠ {phrase}")
+                else:
+                    display_label = display_labels.get(phrase, f"⚠ {phrase}")
+
+                all_bboxes.append(bbox)
+                all_labels.append(display_label)
+                claimed_regions.append({"bbox": bbox, "phrase_type": phrase})
 
         except Exception as e:
             print(f"  ⚠ Grounding failed for '{phrase}': {e}")
@@ -141,6 +163,95 @@ def detect_hazards_by_grounding(
 
     print(f"  ✓ Found {len(all_bboxes)} hazard region(s) across {len(phrases)} phrase(s)")
     return {"bboxes": all_bboxes, "labels": all_labels}
+
+
+# ── Hazmat placard OCR ────────────────────────────────────────────────────────
+
+def identify_hazmat_placard(
+    florence_engine: "FlorenceEngine",
+    image: Image.Image,
+    bbox,
+    hazmat_classes: dict,
+    hazmat_placard_keywords: dict,
+) -> Optional[str]:
+    """
+    Crop the bbox from image, run Florence OCR, and parse for:
+      1. UN numbers       (4-digit, e.g. "1203")
+      2. Hazard class     (e.g. "3", "6.1")
+      3. Keyword labels   (e.g. "FLAMMABLE", "CORROSIVE")
+
+    Returns a human-readable label like:
+      "Flammable Liquid (Class 3, UN 1203)"
+    or None if no placard text is recognised.
+    """
+    x1, y1, x2, y2 = int(bbox[0]), int(bbox[1]), int(bbox[2]), int(bbox[3])
+    # Guard against degenerate boxes
+    if x2 <= x1 or y2 <= y1:
+        return None
+
+    crop = image.crop((x1, y1, x2, y2))
+
+    try:
+        ocr_text = florence_engine.read_text(crop)
+    except Exception as e:
+        print(f"  ⚠ Placard OCR failed: {e}")
+        return None
+
+    if not ocr_text:
+        return None
+
+    text_upper = ocr_text.upper()
+    text_lower = ocr_text.lower()
+    print(f"  🔤 Placard OCR: {ocr_text!r}")
+
+    # 1 — UN number (4 consecutive digits, optionally prefixed "UN")
+    un_match = re.search(r'\bUN\s*(\d{4})\b|\b(\d{4})\b', text_upper)
+    un_number = None
+    if un_match:
+        un_number = un_match.group(1) or un_match.group(2)
+
+    # 2 — Hazard class number (e.g. "3", "6.1", "2.3")
+    class_match = re.search(r'\b(\d(?:\.\d{1,2})?)\b', ocr_text)
+    class_name = None
+    if class_match:
+        candidate = class_match.group(1)
+        # Only use if it maps to a known class (avoid matching stray digits)
+        class_name = hazmat_classes.get(candidate)
+
+    # 3 — Keyword labels (scan all registered keywords)
+    keyword_name = None
+    for kw, label in hazmat_placard_keywords.items():
+        if kw in text_lower:
+            keyword_name = label
+            break  # first match wins (keywords are ordered by priority in YAML)
+
+    # Build result string from whatever was found
+    parts = []
+    if keyword_name:
+        parts.append(keyword_name)
+    elif class_name:
+        parts.append(class_name)
+
+    if class_name and class_name not in parts:
+        parts.append(f"Class {class_match.group(1)}")
+    elif class_name:
+        parts.append(f"Class {class_match.group(1)}")
+
+    if un_number:
+        parts.append(f"UN {un_number}")
+
+    if not parts:
+        return None
+
+    # Deduplicate while preserving order
+    seen = set()
+    deduped = []
+    for p in parts:
+        if p not in seen:
+            seen.add(p)
+            deduped.append(p)
+
+    return " · ".join(deduped)
 
 
 # ── OD cross-reference ────────────────────────────────────────────────────────

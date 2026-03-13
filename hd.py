@@ -3,13 +3,14 @@ HazardousSceneAnalyzer — pipeline orchestrator
 ===============================================
 This file is intentionally thin. All logic lives in dedicated modules:
 
-  florence_engine.py   — vision model (loading, preprocessing, inference)
-  llm_engine.py        — reasoning model (loading, streaming, JSON parsing)
-  grounding.py         — phrase → bbox detection helpers
-  assessment.py        — LLM + keyword hazard assessment
-  reporting.py         — visualization and text reporting
-  hazard_config.yaml   — all labels, keywords, colours (edit without touching Python)
-  prompts.py           — LLM system prompt + HAZMAT_VOCABULARY
+  engines/florence_engine.py   — vision model (loading, preprocessing, inference)
+  engines/llm_engine.py        — reasoning model (loading, streaming, JSON parsing)
+  utils/grounding.py           — phrase → bbox detection helpers
+  utils/assessment.py          — LLM + keyword hazard assessment
+  utils/reporting.py           — visualization and text reporting
+  configs/hazard_config.yaml   — all labels, keywords, colours (edit without touching Python)
+  utils/prompts.py             — LLM system prompt + HAZMAT_VOCABULARY
+  object_Dectetion/owl.py      — OWLv2 drop-in detector
 """
 
 import json
@@ -27,19 +28,21 @@ import utils.assessment as _assessment
 import utils.reporting as _reporting
 
 # ── Load config ───────────────────────────────────────────────────────────────
-_CFG_PATH = Path(__file__).with_name("hazard_config.yaml")
+_CFG_PATH = Path(__file__).parent / "configs" / "hazard_config.yaml"
 with _CFG_PATH.open("r", encoding="utf-8") as _f:
     _CFG = yaml.safe_load(_f)
 
 # Expose config sections as module-level names for readability
-_ALWAYS_CHECK       = _CFG["always_check"]
-_DISPLAY_LABELS     = _CFG["display_labels"]
-_SUBSTANCE_HEDGES   = [tuple(p) for p in _CFG["substance_hedges"]]
-_VALID_HAZARD_TYPES = set(_CFG["valid_hazard_types"])
-_HAZARD_KEYWORDS    = _CFG["hazard_keywords"]
-_OD_HAZARD_MAP      = _CFG["od_hazard_map"]
-_HAZARD_COLORS      = _CFG["hazard_colors"]
-_SEVERITY_MESSAGES  = _CFG["severity_messages"]
+_ALWAYS_CHECK             = _CFG["always_check"]
+_DISPLAY_LABELS           = _CFG["display_labels"]
+_SUBSTANCE_HEDGES         = [tuple(p) for p in _CFG["substance_hedges"]]
+_VALID_HAZARD_TYPES       = set(_CFG["valid_hazard_types"])
+_HAZARD_KEYWORDS          = _CFG["hazard_keywords"]
+_OD_HAZARD_MAP            = _CFG["od_hazard_map"]
+_HAZARD_COLORS            = _CFG["hazard_colors"]
+_SEVERITY_MESSAGES        = _CFG["severity_messages"]
+_HAZMAT_CLASSES           = _CFG.get("hazmat_classes", {})
+_HAZMAT_PLACARD_KEYWORDS  = _CFG.get("hazmat_placard_keywords", {})
 
 
 # ── Analyzer ──────────────────────────────────────────────────────────────────
@@ -92,6 +95,8 @@ class HazardousSceneAnalyzer:
         return _grounding.detect_hazards_by_grounding(
             self.florence, image, caption,
             _DISPLAY_LABELS, HAZMAT_VOCABULARY, _ALWAYS_CHECK,
+            hazmat_classes=_HAZMAT_CLASSES,
+            hazmat_placard_keywords=_HAZMAT_PLACARD_KEYWORDS,
         )
 
     # ── Main pipeline ─────────────────────────────────────────────────────────
@@ -195,8 +200,6 @@ class HazardousSceneAnalyzer:
             decision_support = _assessment.generate_explanation(
                 object_labels, hazard_assessment, _SEVERITY_MESSAGES
             )
-        summary = hazard_assessment.get("summary") or decision_support
-
         # Deduplicate objects list (OD labels + hazard labels merged)
         objects_all = object_labels + [
             h["label"].replace("⚠ ", "") for h in hazard_grounded_list
@@ -210,41 +213,29 @@ class HazardousSceneAnalyzer:
 
         print("  ✅ Analysis complete!")
         return {
-            "objects_detected": objects_deduped,
-            "objects_detected_detail": [
+            "objects_detected":    objects_deduped,
+            "possible_hazards":    hazard_assessment["detected_hazard_types"],
+            "severity":            hazard_assessment["severity"],
+            "explanation":         decision_support,
+            "confidence":          hazard_assessment.get("confidence", 0.5),
+            "clarifying_question": hazard_assessment.get("clarifying_question"),
+            # Prefixed with _ — used by visualize(), not shown in print_report()
+            "_objects_detected_detail": [
                 {
                     "label": label,
-                    "bounding_box": {
-                        "x1": int(b[0]), "y1": int(b[1]),
-                        "x2": int(b[2]), "y2": int(b[3]),
-                    },
+                    "bounding_box": {"x1": int(b[0]), "y1": int(b[1]),
+                                     "x2": int(b[2]), "y2": int(b[3])},
                 }
                 for label, b in zip(object_labels, bboxes)
             ],
-            "hazards_detected_detail": [
+            "_hazards_detected_detail": [
                 {
                     "label": label,
-                    "bounding_box": {
-                        "x1": int(b[0]), "y1": int(b[1]),
-                        "x2": int(b[2]), "y2": int(b[3]),
-                    },
+                    "bounding_box": {"x1": int(b[0]), "y1": int(b[1]),
+                                     "x2": int(b[2]), "y2": int(b[3])},
                 }
                 for label, b in zip(hazard_grounding.get("labels", []), hazard_bboxes)
             ],
-            "scene_summary": {
-                "description":    caption,
-                "possible_hazards": hazard_assessment["detected_hazard_types"],
-                "severity":       hazard_assessment["severity"],
-                "hazard_details": hazard_assessment.get("hazards_detail", []),
-                "dense_regions":  dense_region_list,
-            },
-            "explanation":         decision_support,
-            "full_briefing":       summary,
-            "recommendations":     hazard_assessment.get("recommendations", []),
-            "confidence":          hazard_assessment.get("confidence", 0.5),
-            "clarifying_question": hazard_assessment.get("clarifying_question"),
-            "image_path":          str(image_path),
-            "reasoning_source":    hazard_assessment.get("source", "unknown"),
         }
 
     # ── Reporting (thin wrappers for backward-compat) ─────────────────────────
@@ -294,9 +285,10 @@ def batch_process(image_folder: str, output_folder: str = "./results",
         except Exception as e:
             print(f"❌ Error processing {img_path.name}: {e}")
 
+    clean = [{k: v for k, v in r.items() if not k.startswith("_")} for r in results]
     json_path = output_folder / "all_results.json"
     with open(json_path, "w") as f:
-        json.dump(results, f, indent=2)
+        json.dump(clean, f, indent=2)
     print(f"\n💾 Results saved to: {json_path}")
     return results
 
@@ -316,7 +308,7 @@ if __name__ == "__main__":
         analyzer.print_report(result)
         analyzer.visualize(str(input_path), result, "annotated_output.jpg")
         with open("result.json", "w") as f:
-            json.dump(result, f, indent=2)
+            json.dump({k: v for k, v in result.items() if not k.startswith("_")}, f, indent=2)
         print("\n✅ Saved: annotated_output.jpg, result.json")
         analyzer.cleanup()
 

@@ -26,7 +26,7 @@ from transformers import Owlv2Processor, Owlv2ForObjectDetection
 
 
 def _load_detector_config(config_path: Optional[Path] = None) -> dict:
-    cfg_path = config_path or Path(__file__).with_name("config.yaml")
+    cfg_path = config_path or Path(__file__).parent.parent / "configs" / "config.yaml"
     with cfg_path.open("r", encoding="utf-8") as f:
         cfg = yaml.safe_load(f) or {}
 

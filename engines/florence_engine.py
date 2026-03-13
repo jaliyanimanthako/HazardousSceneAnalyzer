@@ -136,6 +136,15 @@ class FlorenceEngine:
         )
         return result.get("<CAPTION_TO_PHRASE_GROUNDING>", {"bboxes": [], "labels": []})
 
+    def read_text(self, image: Image.Image) -> str:
+        """
+        Run OCR on the image and return extracted text.
+        Useful for reading hazmat placards, warning signs, barrel labels, etc.
+        Returns an empty string if no text is found.
+        """
+        result = self.run(image, "<OCR>", max_new_tokens=256)
+        return result.get("<OCR>", "").strip()
+
     # ── Cleanup ───────────────────────────────────────────────────────────────
 
     def cleanup(self):
