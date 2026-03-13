@@ -30,7 +30,7 @@ A 4-bit quantized Llama-3.2-3B-Instruct receives all evidence — detected objec
 
 ### Online mode (`online.py`)
 
-A single API call to a hosted VLM (Qwen2.5-VL-72B or GPT-4o) replaces all four stages. The model receives the image and a structured system prompt, and returns the same JSON assessment in one shot. No local models are loaded — detection, captioning, grounding, and reasoning all happen inside the hosted model. Bounding box annotations are not available in this mode since the API does not return pixel coordinates.
+A single API call to a hosted VLM (Qwen2.5-VL-72B or GPT-4o) replaces all four stages. The model receives the image and a structured system prompt, and returns the same JSON assessment in one shot. No local models are loaded — detection, captioning, grounding, and reasoning all happen inside the hosted model. Bounding box coordinates are returned in the JSON response and plotted onto the output image as a post-processing step.
 
 ---
 
@@ -62,7 +62,7 @@ Each image produces:
 
 **Annotated output examples:**
 
-| Original image | Offline mode — OWLv2 bounding boxes | Online mode — no bounding boxes |
+| Original image | Offline mode — OWLv2 bounding boxes | Online mode — Qwen2.5-VL bounding boxes |
 |---|---|---|
 | ![Original image](Images/1.png) | ![Offline annotated result](Images/annotated_1_local.png) | ![Online annotated result](Images/annotated_1_onlinepng.png) |
 
@@ -181,7 +181,7 @@ Output is saved to `results/` (or the specified directory):
 |---|---|---|
 | Internet required | No | Yes |
 | GPU required | Yes (10–12 GB VRAM) | No |
-| Bounding boxes | Yes | No |
+| Bounding boxes | Yes | Yes |
 | Speed | ~30–50s per image | ~5–15s per image |
 | Accuracy | Good | Higher (larger model) |
 | Cost | Free after download | API usage cost |
