@@ -46,7 +46,7 @@ Each image produces:
 ```
 .
 ├── hd.py                        # Pipeline orchestrator (thin — delegates to modules)
-├── euowl.py                     # CLI entry point (single image or folder)
+├── offline.py                     # CLI entry point (single image or folder)
 │
 ├── engines/
 │   ├── florence_engine.py       # Florence-2 wrapper: loading, preprocessing, all tasks
@@ -61,42 +61,82 @@ Each image produces:
 ├── object_Dectetion/
 │   └── owl.py                   # OWLv2 detector — drop-in for Florence detection
 │
-└── configs/
-    ├── hazard_config.yaml        # Labels, keywords, colours, severity messages, UN hazmat classes
-    └── config.yaml               # OWLv2 queries, confidence thresholds, instance caps
+├── configs/
+│   ├── hazard_config.yaml        # Labels, keywords, colours, severity messages, UN hazmat classes
+│   └── config.yaml               # OWLv2 queries, confidence thresholds, instance caps
+│
+├── offline.py                     # Offline runner (OWLv2 + Florence-2 + Llama)
+└── online.py                    # Online runner (single VLM API call)
 ```
 
 ---
 
-## Usage
+## Running Modes
+
+### Offline mode — `offline.py`
+
+Uses three local models (OWLv2 + Florence-2 + Llama) running entirely on the device. No internet connection required after the initial model download. Produces colour-coded annotated images with bounding boxes.
 
 ```bash
 # Single image
-python euowl.py /path/to/image.jpg
+python offline.py /path/to/image.jpg
 
-# Entire folder — processes all images, saves per-image JSON and annotated images
-python euowl.py /path/to/folder/
+# Entire folder
+python offline.py /path/to/folder/
 
 # Custom output directory
-python euowl.py /path/to/folder/ /path/to/output/
+python offline.py /path/to/folder/ /path/to/output/
 ```
 
+### Online mode — `online.py`
+
+Sends the image to a powerful hosted VLM (Qwen2-VL, GPT-4o, or any OpenAI-compatible endpoint) in a single API call. The model performs detection, captioning, and hazard assessment in one shot — no local GPU required. Requires an API key and internet access.
+
+```bash
+# Qwen2-VL (default) — set QWEN_API_KEY environment variable
+export QWEN_API_KEY=your_key_here
+python online.py /path/to/image.jpg
+
+# GPT-4o — set OPENAI_API_KEY
+export OPENAI_API_KEY=your_key_here
+python online.py /path/to/image.jpg --provider openai
+
+# Custom model or endpoint
+python online.py /path/to/folder/ --model qwen-vl-max-0809 --out-dir results/
+
+# Pass API key directly (without env var)
+python online.py /path/to/image.jpg --api-key sk-... --provider openai
+```
+
+Both modes produce the same JSON output format and use the same terminal report. The online mode does not produce bounding box annotations since the VLM API does not return pixel coordinates.
+
 Output is saved to `results/` (or the specified directory):
-- `annotated_<name>.jpg` — original image with colour-coded bounding boxes
+- `annotated_<name>.jpg` — annotated image (offline) or original image (online)
 - `<name>_result.json` — clean JSON result for that image
 - `all_results.json` — combined results for folder runs
+
+### Choosing a mode
+
+| | Offline (`offline.py`) | Online (`online.py`) |
+|---|---|---|
+| Internet required | No | Yes |
+| GPU required | Yes (10–12 GB VRAM) | No |
+| Bounding boxes | Yes | No |
+| Speed | ~30–50s per image | ~5–15s per image |
+| Accuracy | Good | Higher (larger model) |
+| Cost | Free after download | API usage cost |
 
 ---
 
 ## Models
 
-| Model | Role | Default checkpoint |
-|---|---|---|
-| OWLv2 | Object / hazard detection | `google/owlv2-large-patch14-ensemble` |
-| Florence-2 | Scene captioning, phrase grounding, OCR | `microsoft/Florence-2-base` |
-| Llama | Hazard reasoning, JSON assessment | `meta-llama/Llama-3.2-3B-Instruct` |
+| Model | Role | Default checkpoint | Parameters |
+|---|---|---|---|
+| OWLv2 | Object / hazard detection | `google/owlv2-large-patch14-ensemble` | 307M |
+| Florence-2 | Scene captioning, phrase grounding, OCR | `microsoft/Florence-2-base` | 232M |
+| Llama | Hazard reasoning, JSON assessment | `meta-llama/Llama-3.2-3B-Instruct` | 3.21B |
 
-If your GPU has less than 6 GB VRAM, switch OWLv2 to `google/owlv2-base-patch16-ensemble` in `euowl.py`.
+If your GPU has less than 6 GB VRAM, switch OWLv2 to `google/owlv2-base-patch16-ensemble` in `offline.py`.
 
 The LLM is loaded in 4-bit (BitsAndBytes) by default. Florence-2 runs in float16 on CUDA and float32 on CPU.
 

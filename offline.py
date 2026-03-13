@@ -4,9 +4,9 @@ Hazardous Scene Analysis — OWLv2 runner
 Uses OWLv2 for detection + grounding. Florence kept for captioning only.
 
 Usage:
-  python euowl.py <image_path>              # single image
-  python euowl.py <folder_path>             # all images in folder → results/
-  python euowl.py <folder_path> <out_dir>   # custom output directory
+  python offline.py <image_path>              # single image
+  python offline.py <folder_path>             # all images in folder → results/
+  python offline.py <folder_path> <out_dir>   # custom output directory
 """
 
 import json
@@ -48,8 +48,8 @@ def _process_one(analyzer, img_path: Path, out_dir: Path, t0: float) -> dict:
 def main():
     if len(sys.argv) < 2:
         print("Usage:\n"
-              "  python euowl.py <image_path>\n"
-              "  python euowl.py <folder_path> [output_dir]")
+              "  python offline.py <image_path>\n"
+              "  python offline.py <folder_path> [output_dir]")
         sys.exit(1)
 
     input_path = Path(sys.argv[1])

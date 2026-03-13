@@ -80,7 +80,7 @@ class HazardousSceneAnalyzer:
         print("\n✅ All models loaded successfully!\n")
 
     # ── Vision delegation ─────────────────────────────────────────────────────
-    # Thin wrappers kept for backward-compat (euowl.py monkey-patches these).
+    # Thin wrappers kept for backward-compat (offline.py monkey-patches these).
 
     def detect_objects(self, image: Image.Image) -> dict:
         return self.florence.detect_objects(image)

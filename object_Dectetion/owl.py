@@ -198,34 +198,31 @@ class OWLv2Detector:
     # ── Public API ────────────────────────────────────────────────────────────
 
     def detect_objects(self, image: Image.Image) -> dict:
-        """DROP-IN for HazardousSceneAnalyzer.detect_objects()."""
-        print(f"  📦 OWLv2 object detection ({len(OWL_HAZARD_QUERIES)} queries)...")
-        raw = self._run_owlv2(image)
-        final = self._filter_and_dedup(raw)
+        """DROP-IN for HazardousSceneAnalyzer.detect_objects(). Caches raw detections."""
+        print(f"  📦 OWLv2 detection ({len(OWL_HAZARD_QUERIES)} queries)...")
+        self._cached_detections = self._filter_and_dedup(self._run_owlv2(image))
 
         summary = {}
-        for d in final:
+        for d in self._cached_detections:
             g = self._semantic_group(d["query"])
             summary[g] = summary.get(g, 0) + 1
-        print(f"     ✓ {len(final)} objects (raw={len(raw)}) → {summary}")
+        print(f"     ✓ {len(self._cached_detections)} detections → {summary}")
 
         return {
-            "bboxes": [d["bbox"] for d in final],
-            "labels": [QUERY_TO_OBJECT_LABEL.get(d["query"], d["query"]) for d in final],
+            "bboxes": [d["bbox"] for d in self._cached_detections],
+            "labels": [QUERY_TO_OBJECT_LABEL.get(d["query"], d["query"]) for d in self._cached_detections],
         }
 
     def detect_hazards_by_grounding(self, image: Image.Image,
                                      caption: str = "") -> dict:
-        """DROP-IN for HazardousSceneAnalyzer.detect_hazards_by_grounding()."""
-        print(f"  🎯 OWLv2 hazard grounding ({len(OWL_HAZARD_QUERIES)} queries)...")
-        raw = self._run_owlv2(image)
-        final = self._filter_and_dedup(raw)
-
-        summary = {}
-        for d in final:
-            g = self._semantic_group(d["query"])
-            summary[g] = summary.get(g, 0) + 1
-        print(f"     ✓ {len(final)} hazard regions (raw={len(raw)}) → {summary}")
+        """DROP-IN for HazardousSceneAnalyzer.detect_hazards_by_grounding().
+        Reuses cached detections from detect_objects() — no second forward pass."""
+        final = getattr(self, "_cached_detections", None)
+        if final is None:
+            print(f"  🎯 OWLv2 hazard grounding ({len(OWL_HAZARD_QUERIES)} queries, no cache)...")
+            final = self._filter_and_dedup(self._run_owlv2(image))
+        else:
+            print(f"  🎯 OWLv2 hazard grounding (reusing cached detections)...")
 
         return {
             "bboxes": [d["bbox"] for d in final],

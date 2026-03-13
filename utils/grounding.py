@@ -105,63 +105,63 @@ def detect_hazards_by_grounding(
     img_area      = image.width * image.height
     min_bbox_area = min_area_fraction * img_area
 
-    phrases = build_scene_phrases(caption, hazmat_vocab, always_check)
-    print(f"  🎯 Grounding {len(phrases)} phrases (full scene vocabulary)...")
+    phrases     = build_scene_phrases(caption, hazmat_vocab, always_check)
+    phrase_list = [phrase for _, phrase, _ in phrases]
+    print(f"  🎯 Grounding {len(phrase_list)} phrases in one batch call...")
+
+    # Single Florence inference for all phrases at once
+    combined_caption = ". ".join(phrase_list)
+    try:
+        grounding  = florence_engine.ground_phrase(image, combined_caption)
+    except Exception as e:
+        print(f"  ⚠ Batch grounding failed: {e}")
+        return {"bboxes": [], "labels": []}
+
+    raw_bboxes = grounding.get("bboxes", [])
+    raw_labels = grounding.get("labels", [])
 
     all_bboxes      = []
     all_labels      = []
-    claimed_regions = []   # [{"bbox": [...], "phrase_type": str}]
+    claimed_regions = []
+    phrase_counts   = {}
 
-    for _, phrase, _ in phrases:
-        try:
-            grounding = florence_engine.ground_phrase(image, phrase)
-            bboxes    = list(grounding.get("bboxes", []))
-            if not bboxes:
-                continue
+    for bbox, label in zip(raw_bboxes, raw_labels):
+        phrase = label.lower().strip().rstrip(".")
 
-            # Filter tiny boxes
-            bboxes = [b for b in bboxes if (b[2] - b[0]) * (b[3] - b[1]) >= min_bbox_area]
-            if not bboxes:
-                continue
-
-            # Largest-first, keep top N
-            bboxes.sort(key=lambda b: (b[2] - b[0]) * (b[3] - b[1]), reverse=True)
-            bboxes = bboxes[:max_per_phrase]
-
-            is_placard = phrase in _PLACARD_PHRASES
-
-            for bbox in bboxes:
-                # Only suppress if SAME phrase type overlaps heavily (type-aware dedup)
-                already_claimed = any(
-                    calculate_iou(bbox, r["bbox"]) > iou_threshold
-                    and r["phrase_type"] == phrase
-                    for r in claimed_regions
-                )
-                if already_claimed:
-                    continue
-
-                # Try OCR-based placard identification
-                if is_placard and hazmat_classes and hazmat_placard_keywords:
-                    placard_id = identify_hazmat_placard(
-                        florence_engine, image, bbox,
-                        hazmat_classes, hazmat_placard_keywords,
-                    )
-                    if placard_id:
-                        display_label = f"⚠ hazmat: {placard_id}"
-                    else:
-                        display_label = display_labels.get(phrase, f"⚠ {phrase}")
-                else:
-                    display_label = display_labels.get(phrase, f"⚠ {phrase}")
-
-                all_bboxes.append(bbox)
-                all_labels.append(display_label)
-                claimed_regions.append({"bbox": bbox, "phrase_type": phrase})
-
-        except Exception as e:
-            print(f"  ⚠ Grounding failed for '{phrase}': {e}")
+        # Filter tiny boxes
+        if (bbox[2] - bbox[0]) * (bbox[3] - bbox[1]) < min_bbox_area:
             continue
 
-    print(f"  ✓ Found {len(all_bboxes)} hazard region(s) across {len(phrases)} phrase(s)")
+        # Per-phrase instance cap
+        if phrase_counts.get(phrase, 0) >= max_per_phrase:
+            continue
+
+        # Type-aware IoU dedup
+        already_claimed = any(
+            calculate_iou(bbox, r["bbox"]) > iou_threshold
+            and r["phrase_type"] == phrase
+            for r in claimed_regions
+        )
+        if already_claimed:
+            continue
+
+        # Try OCR-based placard identification
+        is_placard = phrase in _PLACARD_PHRASES
+        if is_placard and hazmat_classes and hazmat_placard_keywords:
+            placard_id = identify_hazmat_placard(
+                florence_engine, image, bbox,
+                hazmat_classes, hazmat_placard_keywords,
+            )
+            display_label = f"⚠ hazmat: {placard_id}" if placard_id else display_labels.get(phrase, f"⚠ {phrase}")
+        else:
+            display_label = display_labels.get(phrase, f"⚠ {phrase}")
+
+        all_bboxes.append(bbox)
+        all_labels.append(display_label)
+        claimed_regions.append({"bbox": bbox, "phrase_type": phrase})
+        phrase_counts[phrase] = phrase_counts.get(phrase, 0) + 1
+
+    print(f"  ✓ Found {len(all_bboxes)} hazard region(s) from {len(phrase_list)} phrase(s)")
     return {"bboxes": all_bboxes, "labels": all_labels}
 
 
