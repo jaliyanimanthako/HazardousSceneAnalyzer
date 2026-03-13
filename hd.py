@@ -19,12 +19,12 @@ from typing import Union, Optional
 import yaml
 from PIL import Image
 
-from prompts import HAZARD_SYSTEM_PROMPT, HAZMAT_VOCABULARY
-from florence_engine import FlorenceEngine
-from llm_engine import LLMEngine
-import grounding as _grounding
-import assessment as _assessment
-import reporting as _reporting
+from utils.prompts import HAZARD_SYSTEM_PROMPT, HAZMAT_VOCABULARY
+from engines.florence_engine import FlorenceEngine
+from engines.llm_engine import LLMEngine
+import utils.grounding as _grounding
+import utils.assessment as _assessment
+import utils.reporting as _reporting
 
 # ── Load config ───────────────────────────────────────────────────────────────
 _CFG_PATH = Path(__file__).with_name("hazard_config.yaml")
