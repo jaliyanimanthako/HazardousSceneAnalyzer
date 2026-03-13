@@ -77,7 +77,7 @@ def visualize(
 
     if save_path:
         image.save(save_path)
-        print(f"  💾 Saved: {save_path}")
+        print(f"  Saved: {save_path}")
 
     return image
 
@@ -92,24 +92,24 @@ def print_report(output: dict) -> None:
     sep = "=" * 65
 
     print(f"\n{sep}")
-    print("🤖 HAZARD ANALYSIS REPORT")
+    print("HAZARD ANALYSIS REPORT")
     print(sep)
 
-    print(f"\n📦 Objects Detected : {', '.join(output.get('objects_detected', [])) or 'None'}")
+    print(f"\nObjects Detected : {', '.join(output.get('objects_detected', [])) or 'None'}")
 
     hazards = output.get("possible_hazards", [])
     severity = output.get("severity", "unknown").upper()
-    print(f"⚠️  Possible Hazards : {', '.join(hazards) or 'None detected'}  [{severity}]")
+    print(f"Possible Hazards : {', '.join(hazards) or 'None detected'}  [{severity}]")
 
-    print(f"\n💡 Explanation :")
+    print(f"\nExplanation :")
     print(f"   {output.get('explanation', '')}")
 
     conf = output.get("confidence", 0.5)
     bar  = "█" * int(conf * 20) + "░" * (20 - int(conf * 20))
-    print(f"\n📊 Confidence : {conf:.2f}  [{bar}]")
+    print(f"\nConfidence : {conf:.2f}  [{bar}]")
 
     if output.get("clarifying_question"):
-        print(f"\n❓ Clarifying Question :")
+        print(f"\nClarifying Question :")
         print(f"   {output['clarifying_question']}")
 
     print(f"\n{sep}\n")

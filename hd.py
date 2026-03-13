@@ -77,7 +77,7 @@ class HazardousSceneAnalyzer:
         self.florence   = FlorenceEngine(model_name, revision=florence_revision)
         self.llm_engine = LLMEngine(llm_name) if use_llm else None
 
-        print("\n✅ All models loaded successfully!\n")
+        print("\nAll models loaded successfully.\n")
 
     # ── Vision delegation ─────────────────────────────────────────────────────
     # Thin wrappers kept for backward-compat (offline.py monkey-patches these).
@@ -141,14 +141,14 @@ class HazardousSceneAnalyzer:
             return mapped
 
         # Step 1 — Object detection
-        print("  📦 Detecting objects...")
+        print("  Detecting objects...")
         objects_result = self.detect_objects(image)
 
         # Step 2 — Caption + dense regions (sequential: Florence is not thread-safe)
-        print("  📝 Generating scene caption...")
+        print("  Generating scene caption...")
         caption = self.get_detailed_caption(image)
 
-        print("  📝 Generating region captions...")
+        print("  Generating region captions...")
         dense_regions = self.get_dense_regions(image)
 
         # Step 3 — Phrase grounding + OD cross-reference
@@ -177,7 +177,7 @@ class HazardousSceneAnalyzer:
         ]
 
         # Step 4 — Hazard assessment (LLM or keyword fallback)
-        print("  🧠 Analyzing hazards...")
+        print("  Analyzing hazards...")
         if self.use_llm and self.llm_engine:
             try:
                 hazard_assessment = _assessment.assess_hazards_with_llm(
@@ -186,7 +186,7 @@ class HazardousSceneAnalyzer:
                     _SUBSTANCE_HEDGES, _VALID_HAZARD_TYPES,
                 )
             except Exception as e:
-                print(f"  ⚠ LLM failed ({e}), using keyword fallback...")
+                print(f"  LLM failed ({e}), using keyword fallback...")
                 hazard_assessment = _assessment.assess_hazards_keywords(
                     object_labels, caption, _HAZARD_KEYWORDS
                 )
@@ -211,7 +211,7 @@ class HazardousSceneAnalyzer:
                 seen.add(o.lower())
                 objects_deduped.append(o)
 
-        print("  ✅ Analysis complete!")
+        print("  Analysis complete.")
         return {
             "objects_detected":    objects_deduped,
             "possible_hazards":    hazard_assessment["detected_hazard_types"],
@@ -271,25 +271,25 @@ def batch_process(image_folder: str, output_folder: str = "./results",
     extensions = {'.jpg', '.jpeg', '.png', '.bmp', '.webp'}
     images     = sorted([f for f in image_folder.iterdir()
                          if f.suffix.lower() in extensions])
-    print(f"\n📁 Found {len(images)} images\n")
+    print(f"\nFound {len(images)} images\n")
 
     results = []
     for img_path in tqdm(images, desc="Processing"):
         try:
-            print(f"\n{'='*50}\n📷 {img_path.name}\n{'='*50}")
+            print(f"\n{'='*50}\n{img_path.name}\n{'='*50}")
             result = analyzer.analyze(str(img_path))
             results.append(result)
             analyzer.print_report(result)
             analyzer.visualize(str(img_path), result,
                                str(output_folder / f"annotated_{img_path.name}"))
         except Exception as e:
-            print(f"❌ Error processing {img_path.name}: {e}")
+            print(f"Error processing {img_path.name}: {e}")
 
     clean = [{k: v for k, v in r.items() if not k.startswith("_")} for r in results]
     json_path = output_folder / "all_results.json"
     with open(json_path, "w") as f:
         json.dump(clean, f, indent=2)
-    print(f"\n💾 Results saved to: {json_path}")
+    print(f"\nResults saved to: {json_path}")
     return results
 
 
@@ -309,11 +309,11 @@ if __name__ == "__main__":
         analyzer.visualize(str(input_path), result, "annotated_output.jpg")
         with open("result.json", "w") as f:
             json.dump({k: v for k, v in result.items() if not k.startswith("_")}, f, indent=2)
-        print("\n✅ Saved: annotated_output.jpg, result.json")
+        print("\nSaved: annotated_output.jpg, result.json")
         analyzer.cleanup()
 
     elif input_path.is_dir():
         batch_process(str(input_path), sys.argv[2] if len(sys.argv) > 2 else "./results")
 
     else:
-        print(f"❌ Invalid path: {input_path}")
+        print(f"Invalid path: {input_path}")

@@ -30,7 +30,7 @@ class FlorenceEngine:
         self.device = device or ("cuda" if torch.cuda.is_available() else "cpu")
         self.model_name = model_name
 
-        print(f"🔧 Loading Florence-2: {model_name} on {self.device}...")
+        print(f"Loading Florence-2: {model_name} on {self.device}...")
         model_kwargs = {
             "trust_remote_code": True,
             "torch_dtype": torch.float16 if self.device == "cuda" else torch.float32,
@@ -44,7 +44,7 @@ class FlorenceEngine:
             model_name, **model_kwargs
         ).to(self.device).eval()
         self.processor = AutoProcessor.from_pretrained(model_name, **proc_kwargs)
-        print("   ✓ Florence-2 loaded")
+        print("   Florence-2 loaded")
 
     # ── Image preprocessing ───────────────────────────────────────────────────
 
@@ -59,7 +59,7 @@ class FlorenceEngine:
             return image
         scale = max_side / max(w, h)
         new_w, new_h = int(w * scale), int(h * scale)
-        print(f"  📐 Resized image {w}×{h} → {new_w}×{new_h} for Florence")
+        print(f"  Resized image {w}x{h} -> {new_w}x{new_h} for Florence")
         return image.resize((new_w, new_h), Image.LANCZOS)
 
     # ── Core runner ───────────────────────────────────────────────────────────
@@ -107,7 +107,7 @@ class FlorenceEngine:
             except RuntimeError as e:
                 if attempt == 2:
                     raise
-                print(f"  ⚠ Florence attempt {attempt + 1} failed: {e}, retrying...")
+                print(f"  Florence attempt {attempt + 1} failed: {e}, retrying...")
                 torch.cuda.empty_cache()
                 gc.collect()
 

@@ -72,6 +72,40 @@ Each image produces:
 
 ---
 
+## Installation
+
+**1. Create a conda environment with Python 3.10**
+
+```bash
+conda create -n hazard-analyzer python=3.10 -y
+conda activate hazard-analyzer
+```
+
+**2. Install dependencies**
+
+```bash
+pip install -r requirements.txt
+```
+
+**3. Set up keys in `.env`**
+
+```bash
+cp .env.sample .env
+# Edit .env and fill in the values below
+```
+
+| Key | Required for | Where to get it |
+|---|---|---|
+| `HF_TOKEN` | Offline mode (Llama download) | [huggingface.co/settings/tokens](https://huggingface.co/settings/tokens) |
+| `OPENROUTER_API_KEY` | Online mode (default) | [openrouter.ai/keys](https://openrouter.ai/keys) |
+| `OPENAI_API_KEY` | Online mode (`--provider openai`) | [platform.openai.com/api-keys](https://platform.openai.com/api-keys) |
+
+> **Llama access:** Before running offline mode, you must accept the Llama-3.2 licence at [huggingface.co/meta-llama/Llama-3.2-3B-Instruct](https://huggingface.co/meta-llama/Llama-3.2-3B-Instruct) using the same HuggingFace account as your token. Access is granted by Meta — first-time requests typically take **10–15 minutes** to be approved. You will receive an email confirmation once access is granted.
+
+A CUDA-capable GPU is required for offline mode. The full pipeline (OWLv2-large + Florence-2-base + Llama-3.2-3B) requires approximately 10–12 GB VRAM.
+
+---
+
 ## Running Modes
 
 ### Offline mode — `offline.py`
@@ -168,12 +202,15 @@ On Jetson, PyTorch uses the onboard CUDA GPU automatically — no code changes a
 
 **Pre-downloading models for offline use**
 
-Before deploying to a machine without internet access, download the models on a connected machine:
+Before deploying to a machine without internet access, download the models on a connected machine. Llama requires a HuggingFace token — run `huggingface-cli login` first, or set `HF_TOKEN` in `.env` and let `offline.py` authenticate automatically.
 
 ```python
+from huggingface_hub import login
+login(token="hf_...")   # or set HF_TOKEN in .env and run offline.py directly
+
 from transformers import AutoProcessor, AutoModelForCausalLM, AutoTokenizer
 
-AutoModelForCausalLM.from_pretrained("microsoft/Florence-2-base",  trust_remote_code=True)
+AutoModelForCausalLM.from_pretrained("microsoft/Florence-2-base", trust_remote_code=True)
 AutoModelForCausalLM.from_pretrained("google/owlv2-large-patch14-ensemble")
 AutoTokenizer.from_pretrained("meta-llama/Llama-3.2-3B-Instruct")
 AutoModelForCausalLM.from_pretrained("meta-llama/Llama-3.2-3B-Instruct")
@@ -206,32 +243,6 @@ All detection behaviour is controlled through YAML — no Python changes needed 
 - `hazmat_classes` — UN class numbers to human-readable names (used for placard OCR)
 - `hazmat_placard_keywords` — text keywords found on placards (FLAMMABLE, CORROSIVE, etc.)
 - `hazard_colors` — bounding box colours per hazard type
-
----
-
-## Installation
-
-**1. Create a conda environment with Python 3.10**
-
-```bash
-conda create -n hazard-analyzer python=3.10 -y
-conda activate hazard-analyzer
-```
-
-**2. Install dependencies**
-
-```bash
-pip install -r requirements.txt
-```
-
-**3. Set up API keys (online mode only)**
-
-```bash
-cp .env.sample .env
-# Edit .env and add your OPENROUTER_API_KEY (or OPENAI_API_KEY)
-```
-
-A CUDA-capable GPU is required for offline mode. The full pipeline (OWLv2-large + Florence-2-base + Llama-3.2-3B) requires approximately 10–12 GB VRAM.
 
 ---
 

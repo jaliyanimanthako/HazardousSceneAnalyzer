@@ -156,14 +156,14 @@ Provide your JSON hazard assessment based ONLY on this evidence."""
         else declared_overall
     )
     if enforced_severity != declared_overall:
-        print(f"  ⚠ Severity corrected: '{declared_overall}' → '{enforced_severity}'")
+        print(f"  Severity corrected: '{declared_overall}' -> '{enforced_severity}'")
 
     # If the LLM returned null but hazards are present, generate a rule-based question.
     # Small models frequently ignore the clarifying_question instruction.
     clarifying = llm_result.get("clarifying_question")
     if not clarifying and seen_types:
         clarifying = _clarifying_question_for(list(seen_types))
-        print(f"  ℹ Clarifying question auto-generated (LLM returned null)")
+        print(f"  Clarifying question auto-generated (LLM returned null)")
 
     return {
         "detected_hazard_types": list(seen_types),

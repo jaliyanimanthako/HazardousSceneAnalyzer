@@ -10,12 +10,24 @@ Usage:
 """
 
 import json
+import os
 import sys
 import time
 from pathlib import Path
 
+from dotenv import load_dotenv
+load_dotenv(Path(__file__).parent / ".env")
+
 from hd import HazardousSceneAnalyzer
 from object_Dectetion.owl import OWLv2Detector
+
+# Authenticate with HuggingFace if a token is present (required for gated models)
+_hf_token = os.getenv("HF_TOKEN")
+if _hf_token:
+    from huggingface_hub import login as _hf_login
+    _hf_login(token=_hf_token, add_to_git_credential=False)
+else:
+    print("Warning: HF_TOKEN not set in .env — gated models (Llama) will fail to download.")
 
 IMAGE_EXTS = {".jpg", ".jpeg", ".png", ".bmp", ".webp"}
 
@@ -26,11 +38,11 @@ def _clean(result: dict) -> dict:
 
 
 def _process_one(analyzer, img_path: Path, out_dir: Path, t0: float) -> dict:
-    print(f"\n{'='*60}\n📷  {img_path.name}\n{'='*60}")
+    print(f"\n{'='*60}\n{img_path.name}\n{'='*60}")
     t1 = time.time()
     result = analyzer.analyze(str(img_path))
-    print(f"⏱  Analysis latency : {time.time() - t1:.2f}s")
-    print(f"⏱  Total so far     : {time.time() - t0:.2f}s")
+    print(f"  Analysis latency : {time.time() - t1:.2f}s")
+    print(f"  Total so far     : {time.time() - t0:.2f}s")
 
     analyzer.print_report(result)
 
@@ -40,7 +52,7 @@ def _process_one(analyzer, img_path: Path, out_dir: Path, t0: float) -> dict:
     json_path = out_dir / f"{img_path.stem}_result.json"
     with open(json_path, "w") as f:
         json.dump(_clean(result), f, indent=2)
-    print(f"  💾 JSON saved : {json_path}")
+    print(f"  JSON saved : {json_path}")
 
     return result
 
@@ -71,7 +83,7 @@ def main():
     )
     analyzer.detect_objects             = lambda img: owl.detect_objects(img)
     analyzer.detect_hazards_by_grounding = lambda img, cap="": owl.detect_hazards_by_grounding(img, cap)
-    print(f"\n⏱  Model loading : {time.time() - t0:.2f}s")
+    print(f"\n  Model loading : {time.time() - t0:.2f}s")
 
     # ── Single image ─────────────────────────────────────────────────────────
     if input_path.is_file():
@@ -82,30 +94,30 @@ def main():
         images = sorted(f for f in input_path.iterdir()
                         if f.suffix.lower() in IMAGE_EXTS)
         if not images:
-            print(f"❌ No images found in {input_path}")
+            print(f"No images found in {input_path}")
             sys.exit(1)
 
-        print(f"\n📁 Found {len(images)} image(s) → saving to '{out_dir}/'")
+        print(f"\nFound {len(images)} image(s) -> saving to '{out_dir}/'")
         all_results = []
         for img_path in images:
             try:
                 result = _process_one(analyzer, img_path, out_dir, t0)
                 all_results.append({"image": img_path.name, **_clean(result)})
             except Exception as e:
-                print(f"❌ Failed on {img_path.name}: {e}")
+                print(f"Failed on {img_path.name}: {e}")
 
         summary_path = out_dir / "all_results.json"
         with open(summary_path, "w") as f:
             json.dump(all_results, f, indent=2)
-        print(f"\n💾 Combined results saved to : {summary_path}")
+        print(f"\nCombined results saved to : {summary_path}")
 
     else:
-        print(f"❌ Invalid path: {input_path}")
+        print(f"Invalid path: {input_path}")
         sys.exit(1)
 
     owl.cleanup()
     analyzer.cleanup()
-    print(f"\n✅ Done! Results saved in '{out_dir}/'")
+    print(f"\nDone. Results saved in '{out_dir}'")
 
 
 if __name__ == "__main__":

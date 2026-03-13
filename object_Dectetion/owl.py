@@ -101,13 +101,13 @@ class OWLv2Detector:
         self.iou_dedup_threshold = iou_dedup_threshold
         self.min_area_fraction = min_area_fraction
 
-        print(f"🔧 Loading OWLv2: {model_name} on {self.device}...")
+        print(f"Loading OWLv2: {model_name} on {self.device}...")
         self.processor = Owlv2Processor.from_pretrained(model_name)
         self.model = Owlv2ForObjectDetection.from_pretrained(
             model_name,
             torch_dtype=torch.float16 if self.device == "cuda" else torch.float32,
         ).to(self.device).eval()
-        print(f"   ✓ OWLv2 loaded ({len(OWL_HAZARD_QUERIES)} queries | "
+        print(f"   OWLv2 loaded ({len(OWL_HAZARD_QUERIES)} queries | "
               f"iou_dedup={iou_dedup_threshold} | min_area={min_area_fraction:.1%})")
 
     # ── Core inference ────────────────────────────────────────────────────────
@@ -199,14 +199,14 @@ class OWLv2Detector:
 
     def detect_objects(self, image: Image.Image) -> dict:
         """DROP-IN for HazardousSceneAnalyzer.detect_objects(). Caches raw detections."""
-        print(f"  📦 OWLv2 detection ({len(OWL_HAZARD_QUERIES)} queries)...")
+        print(f"  OWLv2 detection ({len(OWL_HAZARD_QUERIES)} queries)...")
         self._cached_detections = self._filter_and_dedup(self._run_owlv2(image))
 
         summary = {}
         for d in self._cached_detections:
             g = self._semantic_group(d["query"])
             summary[g] = summary.get(g, 0) + 1
-        print(f"     ✓ {len(self._cached_detections)} detections → {summary}")
+        print(f"     {len(self._cached_detections)} detections: {summary}")
 
         return {
             "bboxes": [d["bbox"] for d in self._cached_detections],
@@ -219,10 +219,10 @@ class OWLv2Detector:
         Reuses cached detections from detect_objects() — no second forward pass."""
         final = getattr(self, "_cached_detections", None)
         if final is None:
-            print(f"  🎯 OWLv2 hazard grounding ({len(OWL_HAZARD_QUERIES)} queries, no cache)...")
+            print(f"  OWLv2 hazard grounding ({len(OWL_HAZARD_QUERIES)} queries, no cache)...")
             final = self._filter_and_dedup(self._run_owlv2(image))
         else:
-            print(f"  🎯 OWLv2 hazard grounding (reusing cached detections)...")
+            print(f"  OWLv2 hazard grounding (reusing cached detections)...")
 
         return {
             "bboxes": [d["bbox"] for d in final],

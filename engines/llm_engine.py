@@ -65,7 +65,7 @@ class LLMEngine:
         # device is informational; actual placement is handled by device_map="auto"
         self.device = device or ("cuda" if torch.cuda.is_available() else "cpu")
 
-        print(f"🔧 Loading LLM: {model_name}...")
+        print(f"Loading LLM: {model_name}...")
         bnb_config = BitsAndBytesConfig(
             load_in_4bit=True,
             bnb_4bit_compute_dtype=torch.float16,
@@ -78,7 +78,7 @@ class LLMEngine:
             device_map="auto",
             torch_dtype=torch.float16,
         )
-        print("   ✓ LLM loaded")
+        print("   LLM loaded")
 
     # ── Inference ─────────────────────────────────────────────────────────────
 

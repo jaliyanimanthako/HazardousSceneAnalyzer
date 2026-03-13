@@ -107,14 +107,14 @@ def detect_hazards_by_grounding(
 
     phrases     = build_scene_phrases(caption, hazmat_vocab, always_check)
     phrase_list = [phrase for _, phrase, _ in phrases]
-    print(f"  🎯 Grounding {len(phrase_list)} phrases in one batch call...")
+    print(f"  Grounding {len(phrase_list)} phrases in one batch call...")
 
     # Single Florence inference for all phrases at once
     combined_caption = ". ".join(phrase_list)
     try:
         grounding  = florence_engine.ground_phrase(image, combined_caption)
     except Exception as e:
-        print(f"  ⚠ Batch grounding failed: {e}")
+        print(f"  Batch grounding failed: {e}")
         return {"bboxes": [], "labels": []}
 
     raw_bboxes = grounding.get("bboxes", [])
@@ -161,7 +161,7 @@ def detect_hazards_by_grounding(
         claimed_regions.append({"bbox": bbox, "phrase_type": phrase})
         phrase_counts[phrase] = phrase_counts.get(phrase, 0) + 1
 
-    print(f"  ✓ Found {len(all_bboxes)} hazard region(s) from {len(phrase_list)} phrase(s)")
+    print(f"  Found {len(all_bboxes)} hazard region(s) from {len(phrase_list)} phrase(s)")
     return {"bboxes": all_bboxes, "labels": all_labels}
 
 
@@ -194,7 +194,7 @@ def identify_hazmat_placard(
     try:
         ocr_text = florence_engine.read_text(crop)
     except Exception as e:
-        print(f"  ⚠ Placard OCR failed: {e}")
+        print(f"  Placard OCR failed: {e}")
         return None
 
     if not ocr_text:
@@ -202,7 +202,7 @@ def identify_hazmat_placard(
 
     text_upper = ocr_text.upper()
     text_lower = ocr_text.lower()
-    print(f"  🔤 Placard OCR: {ocr_text!r}")
+    print(f"  Placard OCR: {ocr_text!r}")
 
     # 1 — UN number (4 consecutive digits, optionally prefixed "UN")
     un_match = re.search(r'\bUN\s*(\d{4})\b|\b(\d{4})\b', text_upper)
