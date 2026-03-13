@@ -1,28 +1,36 @@
 # Hazardous Scene Analyzer
 
-A multi-model pipeline for detecting and assessing hazards in industrial environments. It combines open-vocabulary object detection (OWLv2), vision captioning (Florence-2), and LLM-based reasoning (Llama) to produce structured hazard reports with operator-facing explanations.
+A multi-model pipeline for detecting and assessing hazards in industrial environments. It produces structured hazard reports with bounding box annotations and operator-facing explanations, and supports two operating modes:
 
-The entire pipeline runs fully offline — no API calls, no internet connection required at inference time. All models are loaded locally from HuggingFace checkpoints (downloaded once, then cached). This makes it suitable for deployment on onboard compute hardware such as NVIDIA Jetson boards, where network connectivity may be limited or unavailable and inference must happen on the robot itself.
+**Offline mode** runs entirely on-device using three local models — OWLv2 (open-vocabulary detection), Florence-2 (captioning and phrase grounding), and Llama-3.2-3B (LLM reasoning). No internet connection is required at inference time. Models are loaded from HuggingFace checkpoints on first run and cached locally. This mode is designed for edge deployment on hardware such as NVIDIA Jetson boards where connectivity cannot be guaranteed.
 
-Model choices reflect this constraint: Florence-2-base, OWLv2, and Llama-3.2-3B are compact enough to run on Jetson AGX Orin class hardware (64 GB unified memory) with acceptable latency. Larger variants (Florence-2-large, OWLv2-large, Llama-3.1-8B) can be substituted if more capable hardware is available.
+**Online mode** sends the image to a hosted vision-language model (Qwen2.5-VL-72B via OpenRouter, or GPT-4o via OpenAI) in a single API call. The model performs detection, captioning, and hazard assessment in one shot — no local GPU required, just an API key and internet access.
+
+Both modes produce the same JSON output format and terminal report. For detailed hardware requirements and edge deployment, see the [Offline and Edge Deployment](#offline-and-edge-deployment) section.
 
 ---
 
 ## How It Works
 
-The pipeline has four stages:
+### Offline mode (`offline.py`)
+
+Four stages run locally on-device:
 
 **1. Detection**
 OWLv2 detects objects and hazard regions using 24 natural-language queries (fire, smoke, spills, barrels, structural damage, personnel, etc.). Results go through three cleanup passes: per-category confidence thresholds, type-aware IoU deduplication, and per-type instance caps.
 
 **2. Captioning**
-Florence-2 generates a detailed scene description and dense per-region captions. These are used both as input to the LLM and as fallback output if the LLM fails.
+Florence-2 generates a detailed scene description and dense per-region captions. These are used as input to the LLM and as fallback context if the LLM fails.
 
 **3. Phrase Grounding**
-Florence-2's phrase grounding task localises hazard vocabulary against the scene caption. When a hazmat placard is detected, the region is cropped and passed through Florence OCR to identify the UN class number and substance keywords.
+Florence-2's phrase grounding task localises hazard vocabulary against the scene caption to produce bounding boxes. When a hazmat placard is detected, the region is cropped and passed through Florence OCR to identify the UN class number and substance keywords.
 
 **4. Hazard Assessment**
-A 4-bit quantized LLM (Llama-3.2-3B-Instruct) receives all evidence — detected objects, scene caption, region descriptions, and grounded hazard locations — and returns a structured JSON assessment. If the LLM fails, a keyword-based fallback runs automatically.
+A 4-bit quantized Llama-3.2-3B-Instruct receives all evidence — detected objects, scene caption, region descriptions, and grounded hazard locations — and returns a structured JSON assessment. If the LLM fails, a keyword-based fallback runs automatically.
+
+### Online mode (`online.py`)
+
+A single API call to a hosted VLM (Qwen2.5-VL-72B or GPT-4o) replaces all four stages. The model receives the image and a structured system prompt, and returns the same JSON assessment in one shot. No local models are loaded — detection, captioning, grounding, and reasoning all happen inside the hosted model. Bounding box annotations are not available in this mode since the API does not return pixel coordinates.
 
 ---
 
@@ -38,6 +46,19 @@ Each image produces:
 | `explanation` | Risk-focused narrative for the operator — why the hazards are dangerous and what action is needed |
 | `confidence` | Model confidence score (0.0 – 1.0) |
 | `clarifying_question` | Single highest-priority question that would change the response protocol |
+
+**Example output (`<name>_result.json`):**
+
+```json
+{
+  "objects_detected": ["barrel", "worker", "forklift"],
+  "possible_hazards": ["chemical", "spill"],
+  "severity": "high",
+  "explanation": "HIGH CHEMICAL hazard: appropriate PPE cannot be selected until the substance is identified — treat as hazardous until confirmed otherwise. HIGH SPILL hazard: creates slip, contamination, and potential ignition risk — the substance must be identified before containment can begin. Compounding factors: storage barrels near the hazard zone raise contamination risk if contents are unknown or containers are damaged; workers detected inside the hazard perimeter — evacuation status must be confirmed. Do not enter the area without full PPE. Isolate the zone and contact HAZMAT response.",
+  "confidence": 0.82,
+  "clarifying_question": "What substance does the container or barrel label identify? This determines the required PPE and containment protocol."
+}
+```
 
 ---
 
@@ -102,17 +123,15 @@ cp .env.sample .env
 
 > **Llama access:** Before running offline mode, you must accept the Llama-3.2 licence at [huggingface.co/meta-llama/Llama-3.2-3B-Instruct](https://huggingface.co/meta-llama/Llama-3.2-3B-Instruct) using the same HuggingFace account as your token. Access is granted by Meta — first-time requests typically take **10–15 minutes** to be approved. You will receive an email confirmation once access is granted.
 
-A CUDA-capable GPU is required for offline mode. The full pipeline (OWLv2-large + Florence-2-base + Llama-3.2-3B) requires approximately 10–12 GB VRAM.
-
 ---
 
 ## Running Modes
 
 ### Offline mode — `offline.py`
 
-Uses three local models (OWLv2 + Florence-2 + Llama) running entirely on the device. No internet connection required after the initial model download. Produces colour-coded annotated images with bounding boxes.
+Runs three local models (OWLv2 + Florence-2 + Llama) entirely on-device. No internet required after the initial model download. Produces colour-coded annotated images with bounding boxes.
 
-> **Hardware:** The pipeline is designed for edge deployment on NVIDIA Jetson (AGX Orin or similar). For local testing and development, a desktop NVIDIA GPU with CUDA support is required (RTX 3080 / RTX 4070 or better recommended). The full pipeline loads ~10–12 GB of VRAM.
+> **Hardware:** Designed for edge deployment on NVIDIA Jetson (AGX Orin or similar). For desktop development, an NVIDIA GPU with CUDA support is required (RTX 3080 / RTX 4070 or better). The full pipeline loads ~10–12 GB VRAM.
 
 ```bash
 # Single image
@@ -127,14 +146,7 @@ python offline.py /path/to/folder/ /path/to/output/
 
 ### Online mode — `online.py`
 
-Sends the image to a powerful hosted VLM (Qwen2-VL, GPT-4o, or any OpenAI-compatible endpoint) in a single API call. The model performs detection, captioning, and hazard assessment in one shot — no local GPU required. Requires an API key and internet access.
-
-**Setup**: copy `.env.sample` to `.env` and fill in your key:
-
-```bash
-cp .env.sample .env
-# then edit .env and add your key
-```
+Sends the image to a hosted VLM (Qwen2.5-VL-72B via OpenRouter, or GPT-4o via OpenAI) in a single API call. No local GPU required — set your API key in `.env` (see Installation step 3) and run.
 
 ```bash
 # OpenRouter (default) — uses qwen/qwen2.5-vl-72b-instruct
@@ -149,8 +161,6 @@ python online.py /path/to/folder/ --model qwen-vl-max --out-dir results/
 # Pass API key directly (overrides .env)
 python online.py /path/to/image.jpg --api-key sk-... --provider openai
 ```
-
-Both modes produce the same JSON output format and use the same terminal report. The online mode does not produce bounding box annotations since the VLM API does not return pixel coordinates.
 
 Output is saved to `results/` (or the specified directory):
 - `annotated_<name>.jpg` — annotated image (offline) or original image (online)
@@ -185,10 +195,6 @@ The LLM is loaded in 4-bit (BitsAndBytes) by default. Florence-2 runs in float16
 ---
 
 ## Offline and Edge Deployment
-
-The pipeline makes no outbound network calls at inference time. After the initial model download, it operates entirely from local weights. This is intentional — the system is designed to run on mobile robots where connectivity cannot be guaranteed.
-
-**Target hardware: NVIDIA Jetson**
 
 The default model selection is sized for Jetson AGX Orin (64 GB unified memory) or similar onboard GPU platforms:
 
