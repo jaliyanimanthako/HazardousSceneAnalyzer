@@ -60,6 +60,12 @@ Each image produces:
 }
 ```
 
+**Annotated output examples:**
+
+| Original image | Offline mode — OWLv2 bounding boxes | Online mode — no bounding boxes |
+|---|---|---|
+| ![Original image](Images/1.png) | ![Offline annotated result](annotated_1_local.png) | ![Online annotated result](annotated_1_onlinepng.png) |
+
 ---
 
 ## Project Structure

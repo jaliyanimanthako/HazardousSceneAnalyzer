@@ -45,6 +45,12 @@ annotated_output.*
 result.json
 results/
 
+# Allow README assets
+!Images/
+!Images/*
+!annotated_1_local.png
+!annotated_1_onlinepng.png
+
 # Logs
 *.log
 logs/
