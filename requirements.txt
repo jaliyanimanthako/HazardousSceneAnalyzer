@@ -167,3 +167,4 @@ webcolors==25.10.0
 websocket-client==1.9.0
 widgetsnbextension==4.0.15
 yarl==1.22.0
+

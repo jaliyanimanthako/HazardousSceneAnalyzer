@@ -92,19 +92,24 @@ python offline.py /path/to/folder/ /path/to/output/
 
 Sends the image to a powerful hosted VLM (Qwen2-VL, GPT-4o, or any OpenAI-compatible endpoint) in a single API call. The model performs detection, captioning, and hazard assessment in one shot — no local GPU required. Requires an API key and internet access.
 
+**Setup**: copy `.env.sample` to `.env` and fill in your key:
+
 ```bash
-# Qwen2-VL (default) — set QWEN_API_KEY environment variable
-export QWEN_API_KEY=your_key_here
+cp .env.sample .env
+# then edit .env and add your key
+```
+
+```bash
+# OpenRouter (default) — uses qwen/qwen2.5-vl-72b-instruct
 python online.py /path/to/image.jpg
 
-# GPT-4o — set OPENAI_API_KEY
-export OPENAI_API_KEY=your_key_here
+# GPT-4o
 python online.py /path/to/image.jpg --provider openai
 
 # Custom model or endpoint
-python online.py /path/to/folder/ --model qwen-vl-max-0809 --out-dir results/
+python online.py /path/to/folder/ --model qwen-vl-max --out-dir results/
 
-# Pass API key directly (without env var)
+# Pass API key directly (overrides .env)
 python online.py /path/to/image.jpg --api-key sk-... --provider openai
 ```
 
