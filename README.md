@@ -101,20 +101,27 @@ Each image produces:
 
 ## Installation
 
-**1. Create a conda environment with Python 3.10**
+**1. Clone the repository**
+
+```bash
+git clone https://github.com/jaliyanimanthako/HazardousSceneAnalyzer.git
+cd HazardousSceneAnalyzer
+```
+
+**2. Create a conda environment with Python 3.10**
 
 ```bash
 conda create -n hazard-analyzer python=3.10 -y
 conda activate hazard-analyzer
 ```
 
-**2. Install dependencies**
+**3. Install dependencies**
 
 ```bash
 pip install -r requirements.txt
 ```
 
-**3. Set up keys in `.env`**
+**4. Set up keys in `.env`**
 
 ```bash
 cp .env.sample .env
@@ -185,6 +192,8 @@ Output is saved to `results/` (or the specified directory):
 | Speed | ~30–50s per image | ~5–15s per image |
 | Accuracy | Good | Varies (model-dependent — online does not always return higher severity) |
 | Cost | Free after download | API usage cost |
+
+> **Latency note:** The speed gap above is measured on a mid-range desktop GPU. On sufficiently powerful hardware (e.g. NVIDIA RTX 6000 / A100-class or high-end Jetson), offline inference time drops to the same order as a typical API round-trip, making the latency difference between modes negligible.
 
 ---
 
