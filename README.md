@@ -132,9 +132,8 @@ cp .env.sample .env
 |---|---|---|
 | `HF_TOKEN` | Offline mode (Llama download) | [huggingface.co/settings/tokens](https://huggingface.co/settings/tokens) |
 | `OPENROUTER_API_KEY` | Online mode (default) | [openrouter.ai/keys](https://openrouter.ai/keys) |
-| `OPENAI_API_KEY` | Online mode (`--provider openai`) | [platform.openai.com/api-keys](https://platform.openai.com/api-keys) |
 
-> **API cost:** Qwen3-VL-8B via OpenRouter (default) is free. OpenAI (`--provider openai`) requires a paid API account.
+> **API cost:** Qwen3-VL-8B via OpenRouter (default) is free. `OPENAI_API_KEY` is only needed if you explicitly pass `--provider openai`; it is not required for the default setup.
 
 > **Llama access:** Before running offline mode, you must accept the Llama-3.2 licence at [huggingface.co/meta-llama/Llama-3.2-3B-Instruct](https://huggingface.co/meta-llama/Llama-3.2-3B-Instruct) using the same HuggingFace account as your token. Access is granted by Meta — first-time requests typically take **10–15 minutes** to be approved. You will receive an email confirmation once access is granted.
 
