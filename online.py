@@ -46,7 +46,7 @@ PROVIDERS = {
         "base_url":   "https://openrouter.ai/api/v1",
         "model":      "qwen/qwen3-vl-8b-instruct",
         "env_key":    "OPENROUTER_API_KEY",
-        "api_key":    None,  # set OPENROUTER_API_KEY in .env or pass --api-key
+        "api_key":    None,
     },
     "qwen": {
         "base_url":   "https://dashscope-intl.aliyuncs.com/compatible-mode/v1",

@@ -4,9 +4,9 @@ A multi-model pipeline for detecting and assessing hazards in industrial environ
 
 **Offline mode** runs entirely on-device using three local models — OWLv2 (open-vocabulary detection), Florence-2 (captioning and phrase grounding), and Llama-3.2-3B (LLM reasoning). No internet connection is required at inference time. Models are loaded from HuggingFace checkpoints on first run and cached locally. This mode is designed for edge deployment on hardware such as NVIDIA Jetson boards where connectivity cannot be guaranteed.
 
-**Online mode** sends the image to a hosted vision-language model (Qwen2.5-VL-72B via OpenRouter, or GPT-4o via OpenAI) in a single API call. The model performs detection, captioning, and hazard assessment in one shot — no local GPU required, just an API key and internet access.
+**Online mode** sends the image to a hosted vision-language model (Qwen3-VL-8B via OpenRouter, or GPT-4o via OpenAI) in a single API call. The model performs detection, captioning, and hazard assessment in one shot — no local GPU required, just an API key and internet access.
 
-Both modes produce the same JSON output format and terminal report. For detailed hardware requirements and edge deployment, see the [Offline and Edge Deployment](#offline-and-edge-deployment) section.
+Both modes produce the same JSON output format and terminal report. Assessment depth — and therefore severity ratings — may differ between modes: the online VLM reasons over the raw image in one pass, while the offline stack combines OWLv2 detections, Florence captions, and LLM reasoning, which can produce a more conservative or more aggressive severity estimate for the same scene. For detailed hardware requirements and edge deployment, see the [Offline and Edge Deployment](#offline-and-edge-deployment) section.
 
 ---
 
@@ -30,7 +30,7 @@ A 4-bit quantized Llama-3.2-3B-Instruct receives all evidence — detected objec
 
 ### Online mode (`online.py`)
 
-A single API call to a hosted VLM (Qwen2.5-VL-72B or GPT-4o) replaces all four stages. The model receives the image and a structured system prompt, and returns the same JSON assessment in one shot. No local models are loaded — detection, captioning, grounding, and reasoning all happen inside the hosted model. Bounding box coordinates are returned in the JSON response and plotted onto the output image as a post-processing step.
+A single API call to a hosted VLM (Qwen3-VL-8B via OpenRouter, or GPT-4o via OpenAI) replaces all four stages. The model receives the image and a structured system prompt, and returns the same JSON assessment in one shot. No local models are loaded — detection, captioning, grounding, and reasoning all happen inside the hosted model. Bounding box coordinates are returned in the JSON response and plotted onto the output image as a post-processing step.
 
 ---
 
@@ -40,7 +40,7 @@ Each image produces:
 
 | Field | Description |
 |---|---|
-| `objects_detected` | All objects identified by OWLv2 and Florence (offline) or Qwen2.5-VL (online) |
+| `objects_detected` | All objects identified by OWLv2 and Florence (offline) or Qwen3-VL (online) |
 | `possible_hazards` | Canonical hazard types: fire, smoke, chemical, spill, structural, electrical, biological |
 | `severity` | Overall severity: low / medium / high / critical |
 | `explanation` | Risk-focused narrative for the operator — why the hazards are dangerous and what action is needed |
@@ -62,7 +62,7 @@ Each image produces:
 
 **Annotated output examples:**
 
-| Original image | Offline mode — OWLv2 bounding boxes | Online mode — Qwen2.5-VL bounding boxes |
+| Original image | Offline mode — OWLv2 bounding boxes | Online mode — Qwen3-VL bounding boxes |
 |---|---|---|
 | ![Original image](Images/1.png) | ![Offline annotated result](Images/annotated_1_local.png) | ![Online annotated result](Images/annotated_1_onlinepng.png) |
 
@@ -127,7 +127,7 @@ cp .env.sample .env
 | `OPENROUTER_API_KEY` | Online mode (default) | [openrouter.ai/keys](https://openrouter.ai/keys) |
 | `OPENAI_API_KEY` | Online mode (`--provider openai`) | [platform.openai.com/api-keys](https://platform.openai.com/api-keys) |
 
-> **API cost:** Qwen2.5-VL-72B via OpenRouter (default) is free. OpenAI (`--provider openai`) requires a paid API account.
+> **API cost:** Qwen3-VL-8B via OpenRouter (default) is free. OpenAI (`--provider openai`) requires a paid API account.
 
 > **Llama access:** Before running offline mode, you must accept the Llama-3.2 licence at [huggingface.co/meta-llama/Llama-3.2-3B-Instruct](https://huggingface.co/meta-llama/Llama-3.2-3B-Instruct) using the same HuggingFace account as your token. Access is granted by Meta — first-time requests typically take **10–15 minutes** to be approved. You will receive an email confirmation once access is granted.
 
@@ -139,7 +139,7 @@ cp .env.sample .env
 
 Runs three local models (OWLv2 + Florence-2 + Llama) entirely on-device. No internet required after the initial model download. Produces colour-coded annotated images with bounding boxes.
 
-> **Hardware:** Designed for edge deployment on NVIDIA Jetson (AGX Orin or similar). For desktop development, an NVIDIA GPU with CUDA support is required (RTX 3080 / RTX 4070 or better). The full pipeline loads ~10–12 GB VRAM.
+> **Hardware:** Designed for edge deployment on NVIDIA Jetson (AGX Orin or similar). For desktop development, an NVIDIA GPU with CUDA support is required — tested on an NVIDIA RTX 6000 Quadro. The full pipeline loads ~10–12 GB VRAM; a GPU with at least 12 GB VRAM is strongly recommended. A standard RTX 3080 (10 GB) may not have enough headroom to load the full stack.
 
 ```bash
 # Single image
@@ -154,10 +154,10 @@ python offline.py /path/to/folder/ /path/to/output/
 
 ### Online mode — `online.py`
 
-Sends the image to a hosted VLM (Qwen2.5-VL-72B via OpenRouter, or GPT-4o via OpenAI) in a single API call. No local GPU required — set your API key in `.env` (see Installation step 3) and run.
+Sends the image to a hosted VLM (Qwen3-VL-8B via OpenRouter, or GPT-4o via OpenAI) in a single API call. No local GPU required — set your API key in `.env` (see Installation step 3) and run.
 
 ```bash
-# OpenRouter (default) — uses qwen/qwen2.5-vl-72b-instruct
+# OpenRouter (default) — uses qwen/qwen3-vl-8b-instruct
 python online.py /path/to/image.jpg
 
 # GPT-4o
@@ -183,7 +183,7 @@ Output is saved to `results/` (or the specified directory):
 | GPU required | Yes (10–12 GB VRAM) | No |
 | Bounding boxes | Yes | Yes |
 | Speed | ~30–50s per image | ~5–15s per image |
-| Accuracy | Good | Higher (larger model) |
+| Accuracy | Good | Varies (model-dependent — online does not always return higher severity) |
 | Cost | Free after download | API usage cost |
 
 ---
@@ -192,7 +192,7 @@ Output is saved to `results/` (or the specified directory):
 
 | Model | Role | Default checkpoint | Parameters |
 |---|---|---|---|
-| OWLv2 | Object / hazard detection | `google/owlv2-large-patch14-ensemble` | 307M |
+| OWLv2-Large | Object / hazard detection | `google/owlv2-large-patch14-ensemble` | ~400M |
 | Florence-2 | Scene captioning, phrase grounding, OCR | `microsoft/Florence-2-base` | 232M |
 | Llama | Hazard reasoning, JSON assessment | `meta-llama/Llama-3.2-3B-Instruct` | 3.21B |
 
