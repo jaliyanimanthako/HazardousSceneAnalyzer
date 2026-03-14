@@ -79,18 +79,13 @@ RULES:
     - If any hazard is CRITICAL, overall_severity must be CRITICAL.
 12. For clarifying_question: Ask a question whenever the answer would meaningfully change
     the response protocol, the PPE required, or the evacuation decision.
-    You should almost ALWAYS have a clarifying question unless the scene is completely unambiguous
-    (e.g. an empty room with no hazards). When hazards ARE present, there is nearly always
-    something worth confirming with the operator.
-    Return null ONLY when you have already identified all hazards conclusively AND no personnel
-    decisions remain open.
-    BAD: "What is the exact temperature of the flames?" (does not change protocol)
-    BAD: "How long has the fire been burning?" (does not change immediate response)
-    GOOD: "What substance does the barrel/container label identify?" (changes PPE and containment approach)
-    GOOD: "Are personnel still inside the affected area?" (changes evacuation priority)
-    GOOD: "Has the power supply to this zone been isolated?" (changes electrical hazard response)
-    GOOD: "Is the source of the smoke known — fire or chemical release?" (changes response team type)
-    GOOD: "Is the structure currently occupied?" (changes urgency of evacuation order)
+    The question MUST be specific to the actual hazards visible in THIS scene.
+    Do NOT copy example questions verbatim — generate a question grounded in what you observed.
+    Return null ONLY when the scene is completely unambiguous with no hazards present.
+    Ask about: unknown substance identity (if spill/leak visible), personnel status (if workers detected),
+    power isolation (if electrical hazard), smoke source (if smoke without visible fire),
+    structural occupancy (if collapse risk). Choose the single highest-priority open question
+    for THIS specific scene.
 
 IMPORTANT: Your response must be ONLY the JSON object. No preamble, no explanation, no markdown fences.
 Start your response with '{' and end with '}'.
@@ -108,10 +103,10 @@ Respond in valid JSON:
   ],
   "overall_severity": "EXACTLY one of: low, medium, high, critical",
   "confidence": 0.75,
+  "clarifying_question": "question that changes response protocol, or null",
   "summary": "4-8 sentence briefing for team leader combining scene description and hazard assessment",
   "decision_support": "1-3 sentence plain-language explanation of the robot's reasoning for the human operator — what was seen, what risk it implies, and what the operator should consider doing. No jargon.",
-  "recommendations": ["specific actionable recommendation with equipment/protocol", "recommendation 2"],
-  "clarifying_question": "question that changes response protocol, or null"
+  "recommendations": ["specific actionable recommendation with equipment/protocol", "recommendation 2"]
 }"""
 
 # ── Online (VLM) system prompt ────────────────────────────────────────────────
@@ -152,12 +147,13 @@ RULES:
 11. SEVERITY CONSISTENCY RULE: overall_severity must equal the HIGHEST severity among all hazards.
 12. For clarifying_question: Ask a question whenever the answer would meaningfully change
     the response protocol, the PPE required, or the evacuation decision.
-    You should almost ALWAYS have a clarifying question when hazards are present.
-    Return null ONLY when the scene is completely unambiguous with no hazards.
-    GOOD: "What substance does the barrel/container label identify?"
-    GOOD: "Are personnel still inside the affected area?"
-    GOOD: "Has the power supply to this zone been isolated?"
-    GOOD: "Is the source of the smoke known — fire or chemical release?"
+    The question MUST be specific to what you actually observed in THIS scene.
+    Do NOT copy any template or example question — generate one grounded in the visible hazards.
+    Return null ONLY when the scene is completely unambiguous with no hazards present.
+    Ask about: unknown substance identity (if spill/leak is visible), personnel status (if workers
+    are detected), power isolation (if electrical hazard exists), smoke source (if smoke without
+    visible fire), structural occupancy (if collapse risk is present).
+    Pick the single highest-priority open question relevant to THIS specific scene.
 
 After generating the JSON, silently review it once:
 - Is clarifying_question null even though hazards are present? If so, write one.
@@ -190,8 +186,8 @@ Respond in valid JSON:
   ],
   "overall_severity": "EXACTLY one of: low, medium, high, critical",
   "confidence": 0.75,
+  "clarifying_question": "question that changes response protocol, or null",
   "summary": "4-8 sentence briefing for team leader",
   "decision_support": "1-3 sentence plain-language explanation for the human operator.",
-  "recommendations": ["specific actionable recommendation", "recommendation 2"],
-  "clarifying_question": "question that changes response protocol, or null"
+  "recommendations": ["specific actionable recommendation", "recommendation 2"]
 }"""

@@ -158,12 +158,7 @@ Provide your JSON hazard assessment based ONLY on this evidence."""
     if enforced_severity != declared_overall:
         print(f"  Severity corrected: '{declared_overall}' -> '{enforced_severity}'")
 
-    # If the LLM returned null but hazards are present, generate a rule-based question.
-    # Small models frequently ignore the clarifying_question instruction.
     clarifying = llm_result.get("clarifying_question")
-    if not clarifying and seen_types:
-        clarifying = _clarifying_question_for(list(seen_types))
-        print(f"  Clarifying question auto-generated (LLM returned null)")
 
     return {
         "detected_hazard_types": list(seen_types),
@@ -181,31 +176,46 @@ Provide your JSON hazard assessment based ONLY on this evidence."""
 
 # ── Keyword fallback ──────────────────────────────────────────────────────────
 
-def _clarifying_question_for(detected_hazards: list) -> "str | None":
+def _clarifying_question_for(detected_hazards: list, objects: list = None) -> "str | None":
     """
     Return the single most operationally useful clarifying question for the
     detected hazard set. Priority order mirrors response urgency.
+    Uses detected objects to generate more scene-specific questions where possible.
     Returns None only when no hazards were detected.
     """
     if not detected_hazards:
         return None
 
-    hazard_set = set(detected_hazards)
+    hazard_set  = set(detected_hazards)
+    obj_text    = " ".join(objects or []).lower()
 
     if "biological" in hazard_set:
         return "Are personnel still inside the affected area, and have they been accounted for?"
+
     if "fire" in hazard_set:
-        return "Is the fire contained to one area, or is it spreading — and has the building been evacuated?"
+        if "vehicle" in obj_text or "forklift" in obj_text or "truck" in obj_text:
+            return "Is the vehicle fire self-contained, or has it spread to surrounding structures or fuel storage?"
+        return "Is the fire contained to one area, or has it spread — and has the zone been evacuated?"
+
     if "chemical" in hazard_set or "spill" in hazard_set:
-        return "What substance does the container or barrel label identify? This determines the required PPE and containment protocol."
+        if "pipe" in obj_text or "pipeline" in obj_text or "valve" in obj_text:
+            return "Has the supply valve or isolation point for the leaking pipe been shut off?"
+        if "tank" in obj_text or "vessel" in obj_text or "silo" in obj_text:
+            return "What substance is stored in the tank, and what is the current pressure or fill level?"
+        if "barrel" in obj_text or "drum" in obj_text or "canister" in obj_text:
+            return "What does the barrel or container label identify as the stored substance?"
+        # Generic chemical/spill — ask about the source rather than a specific container
+        return "Has the source of the spill or release been identified, and is it still actively leaking?"
+
     if "structural" in hazard_set:
         return "Is the structure currently occupied, and are there signs of progressive collapse?"
+
     if "electrical" in hazard_set:
         return "Has the power supply to this zone been isolated at the breaker?"
-    if "smoke" in hazard_set:
-        return "Is the source of the smoke a fire or a chemical release? This determines whether fire crews or HAZMAT teams respond first."
 
-    # Generic fallback for any other detected hazard type
+    if "smoke" in hazard_set:
+        return "Is the smoke originating from a fire or a chemical release? This determines whether fire crews or HAZMAT teams respond."
+
     primary = detected_hazards[0]
     return f"Can the operator confirm whether the {primary} hazard is active or contained?"
 
@@ -249,7 +259,7 @@ def assess_hazards_keywords(
         "confidence":            0.5,
         "summary":               "",
         "recommendations":       [],
-        "clarifying_question":   _clarifying_question_for(detected_hazards),
+        "clarifying_question":   _clarifying_question_for(detected_hazards, objects),
         "source":                "keyword_fallback",
     }
 

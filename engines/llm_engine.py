@@ -86,7 +86,7 @@ class LLMEngine:
               system_prompt: str,
               user_message: str,
               stream: bool = True,
-              max_new_tokens: int = 800) -> str:
+              max_new_tokens: int = 1200) -> str:
         """
         Run the LLM with a system + user message pair.
         Returns the generated text (streamed to stdout if stream=True).
